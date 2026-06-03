@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 import {
@@ -17,8 +17,6 @@ import {
   CheckCircleIcon,
   CalendarDaysIcon,
 } from "@heroicons/react/24/outline";
-
-const hiddenDateRef = useRef(null);
 
 const categories = [
   { name: "Food", icon: CakeIcon },
@@ -469,10 +467,17 @@ function App() {
             />
 
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              enterKeyHint="done"
               placeholder="Total amount"
               value={splitForm.amount}
-              onChange={(e) => setSplitForm({ ...splitForm, amount: e.target.value })}
+              onChange={(e) =>
+                setSplitForm({
+                  ...splitForm,
+                  amount: e.target.value.replace(/[^0-9.]/g, "")
+                })
+              }
             />
 
             <select
@@ -519,7 +524,7 @@ function App() {
             />
           </>
 
-            <div className="segmented">
+            <div className="segmented-split">
               {["equal", "custom", "percentage"].map((type) => (
                 <button
                   key={type}
@@ -609,7 +614,7 @@ function App() {
           />
         </div>
 
-          <div className="segmented">
+          <div className="segmented-history">
             <button className={historyMode === "all" ? "active" : ""} onClick={() => setHistoryMode("all")}>
               all
             </button>
@@ -804,7 +809,34 @@ function ExpenseModal({ form, setForm, close, save }) {
             ))}
           </select>
 
-          <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+          <>
+            <div
+              className="date-pill-field"
+              onClick={() => document.getElementById("expense-date-picker").showPicker?.()}
+            >
+              <CalendarDaysIcon />
+              <span>
+                {new Date(form.date).toLocaleDateString("en-MY", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+
+            <input
+              id="expense-date-picker"
+              className="hidden-date-input"
+              type="date"
+              value={form.date}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  date: e.target.value,
+                })
+              }
+            />
+        </>
 
           <input placeholder="Note" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
 
