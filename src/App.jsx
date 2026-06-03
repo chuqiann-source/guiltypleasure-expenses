@@ -489,12 +489,23 @@ function App() {
               ))}
             </select>
 
-            <input
-              placeholder="Paid by"
+            <select
               value={splitForm.paidBy}
-              onChange={(e) => setSplitForm({ ...splitForm, paidBy: e.target.value })}
-            />
+              onChange={(e) =>
+                setSplitForm({
+                  ...splitForm,
+                  paidBy: e.target.value,
+                })
+              }
+            >
+              <option value="You">You</option>
 
+              {friends.map((friend) => (
+                 <option key={friend} value={friend}>
+                  {friend}
+                </option>
+              ))}
+            </select>
           <>
             <div
               className="date-pill-field"
