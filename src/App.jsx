@@ -597,12 +597,20 @@ function App() {
 
           {historyMode === "all" && (
             <>
-              <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+              <div className="select-wrap">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+              >
                 <option>All</option>
+
                 {categories.map((category) => (
-                  <option key={category.name}>{category.name}</option>
-                ))}
-              </select>
+                  <option key={category.name}>
+                    {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {filteredHistoryExpenses.length === 0 ? (
                 <p className="empty">No matching expenses.</p>
