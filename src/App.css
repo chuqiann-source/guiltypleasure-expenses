@@ -127,7 +127,9 @@ svg {
 .segmented-split button {
   border: none;
   background: transparent;
-  color: var(--muted);
+
+  color: #8d8479;
+  font-weight: 500;
 
   display: flex;
   justify-content: center;
@@ -143,13 +145,19 @@ svg {
 .currency-toggle .active,
 .segmented-history .active,
 .segmented-split .active {
+  text-transform:uppercase;
   background: var(--card);
-  color: var(--deep);
-  font-weight: 700;
+
+  color: #3b2c1d;
+
+  font-weight: 800;
+  letter-spacing: 0.3px;
 
   display: flex;
   justify-content: center;
   align-items: center;
+
+  box-shadow: inset 0 -2px 0 #7a4e2f;
 }
 
 .duck-card,
@@ -534,8 +542,13 @@ select:focus {
 .category-btn.active {
   background: var(--soft);
   border-color: var(--accent);
+
   color: var(--accent);
-  font-weight: 700;
+
+  font-weight: 800;
+  text-transform: uppercase;
+
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .custom-split {
