@@ -62,6 +62,7 @@ svg {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  max-width: 100%;
   border: 1px solid var(--line);
   background: var(--card);
   color: var(--text);
@@ -78,43 +79,6 @@ svg {
   height: 15px;
   color: var(--deep);
 }
-
-.currency-toggle,
-.segmented {
-  display: grid;
-  background: var(--soft);
-  border-radius: 15px;
-  padding: 4px;
-  gap: 4px;
-}
-
-.currency-toggle {
-  grid-template-columns: repeat(2, 1fr);
-  margin-bottom: 12px;
-}
-
-.segmented {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.currency-toggle button,
-.segmented button {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  border-radius: 12px;
-  padding: 8px 4px;
-  text-transform: lowercase;
-}
-
-.currency-toggle .active,
-.segmented .active {
-  background: var(--card);
-  color: var(--deep);
-  font-weight: 700;
-}
-
-.duck-card,
 .hero-card,
 .section-card,
 .modal,
@@ -123,41 +87,6 @@ svg {
   border: 1px solid var(--line);
   border-radius: 22px;
   box-shadow: 0 8px 24px rgba(47, 42, 36, 0.045);
-}
-
-.duck-card {
-  display: grid;
-  grid-template-columns: 42px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.duck-face {
-  width: 42px;
-  height: 42px;
-  border-radius: 16px;
-  background: var(--soft);
-  display: grid;
-  place-items: center;
-  font-size: 22px;
-}
-
-.duck-card p {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.duck-card button {
-  border: none;
-  background: var(--soft);
-  color: var(--deep);
-  border-radius: 999px;
-  padding: 8px 10px;
-  font-size: 11px;
-  font-weight: 700;
 }
 
 .hero-card {
@@ -184,7 +113,7 @@ svg {
   line-height: 1;
   letter-spacing: -1.4px;
   font-weight: 700;
-  color: var(--text);
+  color: #2f2a24;
 }
 
 .hero-card span {
@@ -205,13 +134,15 @@ svg {
 }
 
 .section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 12px;
 }
 
 .compact-list,
 .transaction-list,
-.split-list,
-.duck-guide {
+.split-list {
   display: grid;
   gap: 9px;
 }
@@ -253,9 +184,8 @@ svg {
 }
 
 .transaction p,
-.split-card p,
-.duck-guide p {
-  margin: 0;
+.split-card p {
+  margin: 2px 0 0;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.35;
@@ -326,7 +256,7 @@ svg {
   font-size: 12px;
   font-weight: 700;
   padding: 13px 18px;
-  box-shadow: 0 18px 34px rgba(122, 78, 47, 0.28);
+  box-shadow: 0 18px 34px rgba(138, 95, 61, 0.28);
   z-index: 12;
 }
 
@@ -418,14 +348,24 @@ select:focus {
 }
 
 .friend-form button,
-.save-btn {
+.save-btn,
+.ghost-btn {
   border: none;
   border-radius: 14px;
   padding: 10px;
   font-weight: 700;
   text-transform: lowercase;
+}
+
+.friend-form button,
+.save-btn {
   background: var(--deep);
   color: var(--card);
+}
+
+.ghost-btn {
+  background: var(--soft);
+  color: var(--deep);
 }
 
 .friend-list {
@@ -490,6 +430,30 @@ select:focus {
   background: var(--soft);
   border-color: var(--accent);
   color: var(--accent);
+  font-weight: 700;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--soft);
+  border-radius: 15px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.segmented button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 12px;
+  padding: 8px 4px;
+  text-transform: lowercase;
+}
+
+.segmented .active {
+  background: var(--card);
+  color: var(--deep);
   font-weight: 700;
 }
 
@@ -559,64 +523,6 @@ select:focus {
 
 .owe-line.settled button {
   color: var(--accent);
-}
-
-/* Duck Animation */
-
-.animated-duck {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  animation: duck-bob 2.4s ease-in-out infinite;
-}
-
-.duck-body {
-  position: relative;
-  width: 34px;
-  height: 26px;
-  background: #e8c96f;
-  border: 2px solid #5f4632;
-  border-radius: 55% 55% 45% 45%;
-}
-
-.duck-eye {
-  position: absolute;
-  top: 7px;
-  left: 22px;
-  width: 4px;
-  height: 4px;
-  background: #211d19;
-  border-radius: 50%;
-}
-
-.duck-beak {
-  position: absolute;
-  top: 11px;
-  right: -8px;
-  width: 10px;
-  height: 6px;
-  background: #c9823f;
-  border-radius: 60%;
-}
-
-.duck-wing {
-  position: absolute;
-  left: 8px;
-  top: 13px;
-  width: 13px;
-  height: 8px;
-  background: #d6aa55;
-  border-radius: 50%;
-}
-
-@keyframes duck-bob {
-  0%, 100% {
-    transform: translateY(0px) rotate(-2deg);
-  }
-
-  50% {
-    transform: translateY(-3px) rotate(2deg);
-  }
 }
 
 @media (max-width: 390px) {
