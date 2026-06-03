@@ -98,7 +98,8 @@ svg {
 }
 
 .currency-toggle,
-.segmented {
+.segmented-history,
+.segmented-split {
   display: grid;
   background: var(--soft);
   border-radius: 15px;
@@ -111,13 +112,19 @@ svg {
   margin-bottom: 12px;
 }
 
-.segmented {
+.segmented-history {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
 }
 
+.segmented-split {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .currency-toggle button,
-.segmented button {
+.segmented-history button,
+.segmented-split button {
   border: none;
   background: transparent;
   color: var(--muted);
@@ -134,7 +141,8 @@ svg {
 }
 
 .currency-toggle .active,
-.segmented .active {
+.segmented-history .active,
+.segmented-split .active {
   background: var(--card);
   color: var(--deep);
   font-weight: 700;
