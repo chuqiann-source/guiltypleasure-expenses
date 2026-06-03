@@ -691,3 +691,14 @@ select:focus {
   appearance: none;
   -webkit-appearance: none;
 }
+
+.select-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.select-wrap select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
