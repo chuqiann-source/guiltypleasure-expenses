@@ -44,6 +44,14 @@ function getDuckStage(level) {
   return "Duckling";
 }
 
+function getDuckAssets(level) {
+  if (level >= 30) return { duck: "duck-30.png", room: "room-30.png" };
+  if (level >= 20) return { duck: "duck-20.png", room: "room-20.png" };
+  if (level >= 10) return { duck: "duck-10.png", room: "room-10.png" };
+  if (level >= 5) return { duck: "duck-05.png", room: "room-05.png" };
+  return { duck: "duck-01.png", room: "room-01.png" };
+}
+
 function App() {
   const today = new Date();
   const todayDate = today.toISOString().slice(0, 10);
@@ -178,6 +186,8 @@ function App() {
   const duckLevel = duck.level;
   const duckStage = getDuckStage(duckLevel);
   const duckXpInLevel = duck.xp % 100;
+  const duckAssets = getDuckAssets(duckLevel);
+  const basePath = "/guiltypleasure-expenses/ducks/";
 
   function rewardDuck(points) {
     const newXp = duck.xp + points;
@@ -370,10 +380,12 @@ function App() {
 
           <section className="duck-card">
             <div className="duck-face animated-duck">
-           <div className="duck-body">
-              <div className="duck-eye" />
-             <div className="duck-beak" />
-             <div className="duck-wing" />
+              <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
+            </div>
+            <div className="duck-body">
+            <div className="duck-eye" />
+            <div className="duck-beak" />
+            <div className="duck-wing" />
            </div>
           </div>
             <div>
@@ -701,7 +713,11 @@ function App() {
       )}
 
       {showDuckGuide && (
-        <DuckGuide close={() => setShowDuckGuide(false)} />
+        <DuckGuide
+          close={() => setShowDuckGuide(false)}
+          duckAssets={duckAssets}
+          basePath={basePath}
+        />
       )}
     </main>
   );
@@ -860,10 +876,13 @@ function ExpenseModal({ form, setForm, close, save }) {
   );
 }
 
-function DuckGuide({ close }) {
+function DuckGuide({ close, duckAssets, basePath }) {
   return (
     <div className="modal-backdrop">
       <section className="modal">
+        <div className="duck-room">
+          <img src={`${basePath}${duckAssets.room}`} alt="Duck room" />
+        </div>
         <div className="modal-head">
           <h2>Duck Evolution</h2>
           <button className="delete-btn" onClick={close}>
