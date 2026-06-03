@@ -202,6 +202,7 @@ svg {
   display: grid;
   gap: 10px;
   align-content: start;
+  overflow: hidden;
 }
 
 .section-title {
@@ -390,7 +391,11 @@ svg {
 }
 
 .modal-form,
-.split-form,
+.split-form {
+  display: grid;
+  gap: 9px;
+  width: 100%;
+}
 .friend-form {
   display: grid;
   gap: 9px;
@@ -403,6 +408,8 @@ svg {
 input,
 select {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--line);
   background: var(--card);
   color: var(--text);
