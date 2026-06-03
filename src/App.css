@@ -94,7 +94,8 @@ svg {
 }
 
 .segmented {
-  grid-template-columns: repeat(3, 1fr);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .currency-toggle button,
@@ -102,9 +103,16 @@ svg {
   border: none;
   background: transparent;
   color: var(--muted);
-  border-radius: 12px;
-  padding: 8px 4px;
-  text-transform: lowercase;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  height: 42px;
+  padding: 0;
+
+  font-size: 12px;
+  line-height: 1;
 }
 
 .currency-toggle .active,
@@ -112,6 +120,10 @@ svg {
   background: var(--card);
   color: var(--deep);
   font-weight: 700;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .duck-card,
@@ -701,4 +713,35 @@ select:focus {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+}
+
+.date-pill-field {
+  width: 100%;
+  height: 50px;
+
+  border: 1px solid var(--line);
+  border-radius: 14px;
+
+  background: var(--card);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  color: var(--text);
+
+  cursor: pointer;
+}
+
+.date-pill-field svg {
+  width: 16px;
+  height: 16px;
+  color: var(--deep);
+}
+
+.hidden-date-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
