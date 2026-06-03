@@ -409,7 +409,7 @@ input,
 select {
   width: 100%;
   max-width: 100%;
-  box-sizing: border-box;
+  min-width: 0;
   border: 1px solid var(--line);
   background: var(--card);
   color: var(--text);
@@ -647,4 +647,25 @@ select:focus {
   .bar {
     width: 82px;
   }
+}
+.date-input-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 14px;
+}
+
+.date-input-wrap input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 10px 11px;
+  text-align: center;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
 }
