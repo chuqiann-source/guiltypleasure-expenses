@@ -578,11 +578,13 @@ function App() {
             <h2>History</h2>
           </div>
 
+        <div className="month-input-wrap">
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
           />
+        </div>
 
           <div className="segmented">
             <button className={historyMode === "all" ? "active" : ""} onClick={() => setHistoryMode("all")}>
