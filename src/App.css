@@ -79,6 +79,24 @@ svg {
   color: var(--deep);
 }
 
+.segmented-history,
+.segmented-split {
+  background: var(--soft);
+  border-radius: 15px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.segmented-history {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.segmented-split {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .currency-toggle,
 .segmented {
   display: grid;
@@ -638,28 +656,6 @@ select:focus {
   }
 }
 
-@media (max-width: 390px) {
-  :root {
-    font-size: 11px;
-  }
-
-  .app {
-    padding-left: 11px;
-    padding-right: 11px;
-  }
-
-  .hero-card h1 {
-    font-size: 38px;
-  }
-
-  .category-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .bar {
-    width: 82px;
-  }
-}
 .date-input-wrap {
   width: 100%;
   max-width: 100%;
@@ -745,3 +741,27 @@ select:focus {
   opacity: 0;
   pointer-events: none;
 }
+
+@media (max-width: 390px) {
+  :root {
+    font-size: 11px;
+  }
+
+  .app {
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+
+  .hero-card h1 {
+    font-size: 38px;
+  }
+
+  .category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bar {
+    width: 82px;
+  }
+}
+
