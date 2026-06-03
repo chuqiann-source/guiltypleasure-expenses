@@ -488,11 +488,13 @@ function App() {
               onChange={(e) => setSplitForm({ ...splitForm, paidBy: e.target.value })}
             />
 
-            <input
-              type="date"
-              value={splitForm.date}
-              onChange={(e) => setSplitForm({ ...splitForm, date: e.target.value })}
-            />
+            <div className="date-input-wrap">
+              <input
+                type="date"
+                value={splitForm.date}
+                onChange={(e) => setSplitForm({ ...splitForm, date: e.target.value })}
+              />
+            </div>
 
             <div className="segmented">
               {["equal", "custom", "percentage"].map((type) => (
