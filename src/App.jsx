@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import "./App.css";
 
 import {
@@ -17,6 +17,8 @@ import {
   CheckCircleIcon,
   CalendarDaysIcon,
 } from "@heroicons/react/24/outline";
+
+const hiddenDateRef = useRef(null);
 
 const categories = [
   { name: "Food", icon: CakeIcon },
@@ -488,13 +490,34 @@ function App() {
               onChange={(e) => setSplitForm({ ...splitForm, paidBy: e.target.value })}
             />
 
-            <div className="date-input-wrap">
-              <input
-                type="date"
-                value={splitForm.date}
-                onChange={(e) => setSplitForm({ ...splitForm, date: e.target.value })}
-              />
+          <>
+            <div
+              className="date-pill-field"
+              onClick={() => document.getElementById("split-date-picker").showPicker?.()}
+            >
+              <CalendarDaysIcon />
+              <span>
+                {new Date(splitForm.date).toLocaleDateString("en-MY", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
             </div>
+
+            <input
+              id="split-date-picker"
+              className="hidden-date-input"
+              type="date"
+              value={splitForm.date}
+              onChange={(e) =>
+                setSplitForm({
+                  ...splitForm,
+                  date: e.target.value,
+                })
+              }
+            />
+          </>
 
             <div className="segmented">
               {["equal", "custom", "percentage"].map((type) => (
@@ -761,7 +784,19 @@ function ExpenseModal({ form, setForm, close, save }) {
             })}
           </div>
 
-          <input type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          <input
+            type="text"
+            inputMode="decimal"
+            pattern="[0-9]*"
+            placeholder="Amount"
+            value={form.amount}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                amount: e.target.value.replace(/[^0-9.]/g, "")
+              })
+            }
+          />
 
           <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
             {currencies.map((currency) => (
