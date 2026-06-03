@@ -101,7 +101,7 @@ svg {
 .segmented-history,
 .segmented-split {
   display: grid;
-  background: var(--soft);
+  background: rgba(122, 78, 47, 0.06);
   border-radius: 15px;
   padding: 4px;
   gap: 4px;
@@ -145,19 +145,18 @@ svg {
 .currency-toggle .active,
 .segmented-history .active,
 .segmented-split .active {
-  text-transform:uppercase;
-  background: var(--card);
+  background: transparent;
 
-  color: #3b2c1d;
+  color: var(--deep);
 
   font-weight: 800;
-  letter-spacing: 0.3px;
+  text-transform: uppercase;
+
+  font-size: 13px;
 
   display: flex;
   justify-content: center;
   align-items: center;
-
-  box-shadow: inset 0 -2px 0 #7a4e2f;
 }
 
 .duck-card,
@@ -501,10 +500,17 @@ select:focus {
 }
 
 .friend-chip.active {
-  background: var(--soft);
+  background: rgba(122, 78, 47, 0.08);
+
   border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 700;
+
+  color: var(--deep);
+
+  font-weight: 800;
+
+  text-transform: uppercase;
+
+  box-shadow: none;
 }
 
 .friend-chip span {
@@ -540,15 +546,17 @@ select:focus {
 }
 
 .category-btn.active {
-  background: var(--soft);
+  background: rgba(122, 78, 47, 0.08);
+
   border-color: var(--accent);
 
-  color: var(--accent);
+  color: var(--deep);
 
   font-weight: 800;
+
   text-transform: uppercase;
 
-  box-shadow: inset 0 -2px 0 var(--accent);
+  box-shadow: none;
 }
 
 .custom-split {
