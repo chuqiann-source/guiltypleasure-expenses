@@ -378,22 +378,18 @@ function App() {
             ))}
           </div>
 
-          <section className="duck-card">
-            <div className="duck-face animated-duck">
-              <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
-            </div>
-            <div className="duck-body">
-            <div className="duck-eye" />
-            <div className="duck-beak" />
-            <div className="duck-wing" />
-           </div>
+         <section className="duck-card">
+          <div className="duck-face animated-duck">
+            <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
           </div>
-            <div>
-              <strong>{duckStage}</strong>
-              <p>Lv. {duckLevel} · XP {duckXpInLevel}/100</p>
-            </div>
-            <button onClick={() => setShowDuckGuide(true)}>evolution</button>
-          </section>
+
+          <div>
+            <strong>{duckStage}</strong>
+            <p>Lv. {duckLevel} · XP {duckXpInLevel}/100</p>
+          </div>
+
+          <button onClick={() => setShowDuckGuide(true)}>evolution</button>
+        </section>
 
           <section className="hero-card">
             <p className="overline">Expenses This Month</p>
