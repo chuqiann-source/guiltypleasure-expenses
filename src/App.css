@@ -655,45 +655,6 @@ select:focus {
   animation: duck-bob 2.4s ease-in-out infinite;
 }
 
-.duck-body {
-  position: relative;
-  width: 34px;
-  height: 26px;
-  background: #e8c96f;
-  border: 2px solid #5f4632;
-  border-radius: 55% 55% 45% 45%;
-}
-
-.duck-eye {
-  position: absolute;
-  top: 7px;
-  left: 22px;
-  width: 4px;
-  height: 4px;
-  background: #211d19;
-  border-radius: 50%;
-}
-
-.duck-beak {
-  position: absolute;
-  top: 11px;
-  right: -8px;
-  width: 10px;
-  height: 6px;
-  background: #c9823f;
-  border-radius: 60%;
-}
-
-.duck-wing {
-  position: absolute;
-  left: 8px;
-  top: 13px;
-  width: 13px;
-  height: 8px;
-  background: #d6aa55;
-  border-radius: 50%;
-}
-
 @keyframes duck-bob {
   0%, 100% {
     transform: translateY(0px) rotate(-2deg);
