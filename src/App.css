@@ -159,6 +159,25 @@ svg {
   align-items: center;
 }
 
+.duck-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.duck-room {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+
+.duck-room img {
+  width: 100%;
+  display: block;
+}
+
 .duck-card,
 .hero-card,
 .section-card,
