@@ -379,8 +379,13 @@ function App() {
           </div>
 
          <section className="duck-card">
-          <div className="duck-face animated-duck">
-            <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
+           <div className="duck-face animated-duck">
+            <div className="duck-wrapper">
+              <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
+
+              <div className="eye-lid left"></div>
+              <div className="eye-lid right"></div>
+            </div>
           </div>
 
           <div>
