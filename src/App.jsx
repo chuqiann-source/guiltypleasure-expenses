@@ -355,6 +355,40 @@ function App() {
     );
   }
 
+      function getSplitBalances() {
+        const balances = {};
+
+      splitBills.forEach((bill) => {
+        bill.owes.forEach((item) => {
+          if (item.settled) return;
+
+            const currency = bill.currency || "RM";
+            const payer = bill.paidBy;
+            const person = item.person;
+            const amount = Number(item.amount || 0);
+
+            if (!balances[currency]) {
+              balances[currency] = {};
+            }
+
+            if (!balances[currency][person]) {
+              balances[currency][person] = 0;
+            }
+
+            if (!balances[currency][payer]) {
+              balances[currency][payer] = 0;
+            }
+
+            balances[currency][person] -= amount;
+            balances[currency][payer] += amount;
+          });
+        });
+
+      return balances;
+      }
+
+      const splitBalances = getSplitBalances();
+  
   return (
     <main className="app">
       <header className="top-header">
@@ -437,7 +471,30 @@ function App() {
           <div className="section-title">
             <h2>Split</h2>
           </div>
+          
+          <div className="balance-box">
+  <strong>Balance</strong>
 
+  {Object.keys(splitBalances).length === 0 ? (
+    <p>No outstanding balance.</p>
+  ) : (
+    Object.entries(splitBalances).map(([currency, people]) => (
+      <div className="balance-group" key={currency}>
+        <span>{currency}</span>
+
+        {Object.entries(people)
+          .filter(([, amount]) => Math.abs(amount) > 0.01)
+          .map(([person, amount]) => (
+            <p key={person}>
+              {amount > 0
+                ? `${person} should receive ${formatMoney(amount, currency)}`
+                : `${person} owes ${formatMoney(Math.abs(amount), currency)}`}
+            </p>
+          ))}
+      </div>
+    ))
+  )}
+</div>
           <form className="friend-form" onSubmit={addFriend}>
             <input
               placeholder="Add friend name"
