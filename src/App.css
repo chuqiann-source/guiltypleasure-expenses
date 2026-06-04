@@ -831,6 +831,32 @@ select:focus {
   pointer-events: none;
 }
 
+.settlement-list {
+  display: grid;
+  gap: 9px;
+}
+
+.settlement-row {
+  background: var(--soft);
+  border-radius: 16px;
+  padding: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settlement-row span {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.settlement-row b {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
 @media (max-width: 390px) {
   :root {
     font-size: 11px;
