@@ -178,6 +178,55 @@ svg {
   display: block;
 }
 
+.duck-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.duck-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.eye-lid {
+  position: absolute;
+
+  width: 12%;
+  height: 0;
+
+  background: #f3d97a;
+
+  border-radius: 999px;
+
+  animation: duck-blink 7s infinite;
+}
+
+.eye-lid.left {
+  left: 36%;
+  top: 34%;
+}
+
+.eye-lid.right {
+  left: 53%;
+  top: 34%;
+}
+
+@keyframes duck-blink {
+
+  0%,
+  94%,
+  100% {
+    height: 0;
+  }
+
+  95%,
+  98% {
+    height: 5px;
+  }
+}
+
 .duck-card,
 .hero-card,
 .section-card,
