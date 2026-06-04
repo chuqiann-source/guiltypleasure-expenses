@@ -67,6 +67,8 @@ function App() {
     return localStorage.getItem("main_currency") || "RM";
   });
 
+  const [showSettlement, setShowSettlement] = useState(false);
+  
   const [expenses, setExpenses] = useState(() => {
     return JSON.parse(localStorage.getItem("guilty_expenses")) || [];
   });
@@ -355,6 +357,73 @@ function App() {
     );
   }
 
+      function calculateSettlements() {
+  const balancesByCurrency = {};
+
+  splitBills.forEach((bill) => {
+    const currency = bill.currency || "RM";
+
+    if (!balancesByCurrency[currency]) {
+      balancesByCurrency[currency] = {};
+    }
+
+    bill.owes.forEach((item) => {
+      if (item.settled) return;
+
+      const payer = bill.paidBy;
+      const debtor = item.person;
+      const amount = Number(item.amount || 0);
+
+      balancesByCurrency[currency][payer] =
+        (balancesByCurrency[currency][payer] || 0) + amount;
+
+      balancesByCurrency[currency][debtor] =
+        (balancesByCurrency[currency][debtor] || 0) - amount;
+    });
+  });
+
+  const settlements = [];
+
+  Object.entries(balancesByCurrency).forEach(([currency, balances]) => {
+    const creditors = [];
+    const debtors = [];
+
+    Object.entries(balances).forEach(([person, amount]) => {
+      if (amount > 0.01) {
+        creditors.push({ person, amount });
+      }
+
+      if (amount < -0.01) {
+        debtors.push({ person, amount: Math.abs(amount) });
+      }
+    });
+
+    let i = 0;
+    let j = 0;
+
+    while (i < debtors.length && j < creditors.length) {
+      const payment = Math.min(debtors[i].amount, creditors[j].amount);
+
+      settlements.push({
+        from: debtors[i].person,
+        to: creditors[j].person,
+        amount: payment,
+        currency,
+      });
+
+      debtors[i].amount -= payment;
+      creditors[j].amount -= payment;
+
+      if (debtors[i].amount <= 0.01) i++;
+      if (creditors[j].amount <= 0.01) j++;
+    }
+  });
+
+  return settlements;
+}
+
+      const settlements = calculateSettlements();
+  
       function getSplitBalances() {
         const balances = {};
 
@@ -745,9 +814,30 @@ function App() {
         </section>
       )}
 
-      <button className="record-button" onClick={() => setShowExpenseModal(true)}>
-        ◉ Record
-      </button>
+      {tab === "home" ? (
+        {tab === "split" ? (
+  <button
+    className="record-button"
+    onClick={() => setShowSettlement(true)}
+  >
+    Balance
+  </button>
+) : (
+  <button
+    className="record-button"
+    onClick={() => setShowExpenseModal(true)}
+  >
+    ◉ Record
+  </button>
+)}
+      ) : tab === "split" ? (
+        <button
+          className="record-button"
+          onClick={() => setShowSettlement(true)}
+        >
+          Balance
+        </button>
+      ) : null}
 
       <nav className="bottom-nav">
         <button className={tab === "home" ? "active" : ""} onClick={() => setTab("home")}>
@@ -770,6 +860,38 @@ function App() {
         />
       )}
 
+      function SettlementModal({ close, settlements }) {
+  return (
+    <div className="modal-backdrop">
+      <section className="modal">
+        <div className="modal-head">
+          <h2>Settlement</h2>
+
+          <button className="delete-btn" onClick={close}>
+            <XMarkIcon />
+          </button>
+        </div>
+
+        <div className="settlement-list">
+          {settlements.length === 0 ? (
+            <p className="empty">No outstanding balances.</p>
+          ) : (
+            settlements.map((item, index) => (
+              <div className="settlement-row" key={index}>
+                <span>
+                  {item.from} → {item.to}
+                </span>
+
+                <b>{formatMoney(item.amount, item.currency)}</b>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+      
       {showDuckGuide && (
         <DuckGuide
           close={() => setShowDuckGuide(false)}
@@ -780,6 +902,13 @@ function App() {
     </main>
   );
 }
+
+      {showSettlement && (
+        <SettlementModal
+          close={() => setShowSettlement(false)}
+          settlements={settlements}
+        />
+      )}
 
 function CategoryList({ items, max, currency }) {
   return (
@@ -955,6 +1084,52 @@ function DuckGuide({ close, duckAssets, basePath }) {
           <p><b>Merchant Duck</b> · Reach Lv.20 through consistent tracking.</p>
           <p><b>Tycoon Duck</b> · Reach Lv.30. Tiny duck empire achieved.</p>
           <p className="hint">Expense +5 XP · Travel +8 XP · Settled debt +10 XP</p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SettlementModal({
+  close,
+  settlements,
+}) {
+  return (
+    <div className="modal-backdrop">
+      <section className="modal">
+        <div className="modal-head">
+          <h2>Settlement</h2>
+
+          <button
+            className="delete-btn"
+            onClick={close}
+          >
+            <XMarkIcon />
+          </button>
+        </div>
+
+        <div className="duck-guide">
+          {settlements.length === 0 ? (
+            <p>No outstanding balances.</p>
+          ) : (
+            settlements.map((item, index) => (
+              <div
+                key={index}
+                className="settlement-row"
+              >
+                <span>
+                  {item.from} → {item.to}
+                </span>
+
+                <b>
+                  {formatMoney(
+                    item.amount,
+                    item.currency
+                  )}
+                </b>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>
