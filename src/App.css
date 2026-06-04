@@ -92,6 +92,40 @@ svg {
   grid-template-columns: repeat(2, 1fr);
 }
 
+.balance-box {
+  background: rgba(122, 78, 47, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.balance-box strong {
+  color: var(--deep);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.balance-box p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.balance-group {
+  display: grid;
+  gap: 4px;
+}
+
+.balance-group span {
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 11px;
+}
+
 .segmented-split {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
