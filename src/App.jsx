@@ -455,8 +455,6 @@ function App() {
 
       return balances;
       }
-
-      const splitBalances = getSplitBalances();
   
   return (
     <main className="app">
@@ -540,30 +538,7 @@ function App() {
           <div className="section-title">
             <h2>Split</h2>
           </div>
-          
-          <div className="balance-box">
-  <strong>Balance</strong>
-
-  {Object.keys(splitBalances).length === 0 ? (
-    <p>No outstanding balance.</p>
-  ) : (
-    Object.entries(splitBalances).map(([currency, people]) => (
-      <div className="balance-group" key={currency}>
-        <span>{currency}</span>
-
-        {Object.entries(people)
-          .filter(([, amount]) => Math.abs(amount) > 0.01)
-          .map(([person, amount]) => (
-            <p key={person}>
-              {amount > 0
-                ? `${person} should receive ${formatMoney(amount, currency)}`
-                : `${person} owes ${formatMoney(Math.abs(amount), currency)}`}
-            </p>
-          ))}
-      </div>
-    ))
-  )}
-</div>
+        
           <form className="friend-form" onSubmit={addFriend}>
             <input
               placeholder="Add friend name"
@@ -860,7 +835,6 @@ function App() {
         />
       )}
 
-      function SettlementModal({ close, settlements }) {
   return (
     <div className="modal-backdrop">
       <section className="modal">
@@ -891,6 +865,13 @@ function App() {
     </div>
   );
 }
+
+      {showSettlement && (
+  <SettlementModal
+    close={() => setShowSettlement(false)}
+    settlements={settlements}
+  />
+)}
       
       {showDuckGuide && (
         <DuckGuide
@@ -902,13 +883,6 @@ function App() {
     </main>
   );
 }
-
-      {showSettlement && (
-        <SettlementModal
-          close={() => setShowSettlement(false)}
-          settlements={settlements}
-        />
-      )}
 
 function CategoryList({ items, max, currency }) {
   return (
