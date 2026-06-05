@@ -423,9 +423,6 @@ function App() {
 }
 
       const settlements = calculateSettlements();
-  
-      function getSplitBalances() {
-        const balances = {};
 
       splitBills.forEach((bill) => {
         bill.owes.forEach((item) => {
@@ -479,6 +476,24 @@ function App() {
             ))}
           </div>
 
+      {showSettlement && (
+  <SettlementModal
+    close={() => setShowSettlement(false)}
+    settlements={settlements}
+  />
+)}
+      
+      {showDuckGuide && (
+        <DuckGuide
+          close={() => setShowDuckGuide(false)}
+          duckAssets={duckAssets}
+          basePath={basePath}
+        />
+      )}
+    </main>
+  );
+}
+          
          <section className="duck-card">
            <div className="duck-face animated-duck">
             <div className="duck-wrapper">
@@ -789,30 +804,21 @@ function App() {
         </section>
       )}
 
-      {tab === "home" ? (
-        {tab === "split" ? (
+{tab === "split" ? (
   <button
     className="record-button"
     onClick={() => setShowSettlement(true)}
   >
     Balance
   </button>
-) : (
+) : tab === "home" ? (
   <button
     className="record-button"
     onClick={() => setShowExpenseModal(true)}
   >
     ◉ Record
   </button>
-)}
-      ) : tab === "split" ? (
-        <button
-          className="record-button"
-          onClick={() => setShowSettlement(true)}
-        >
-          Balance
-        </button>
-      ) : null}
+) : null}}
 
       <nav className="bottom-nav">
         <button className={tab === "home" ? "active" : ""} onClick={() => setTab("home")}>
@@ -834,55 +840,6 @@ function App() {
           save={addExpense}
         />
       )}
-
-  return (
-    <div className="modal-backdrop">
-      <section className="modal">
-        <div className="modal-head">
-          <h2>Settlement</h2>
-
-          <button className="delete-btn" onClick={close}>
-            <XMarkIcon />
-          </button>
-        </div>
-
-        <div className="settlement-list">
-          {settlements.length === 0 ? (
-            <p className="empty">No outstanding balances.</p>
-          ) : (
-            settlements.map((item, index) => (
-              <div className="settlement-row" key={index}>
-                <span>
-                  {item.from} → {item.to}
-                </span>
-
-                <b>{formatMoney(item.amount, item.currency)}</b>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-      {showSettlement && (
-  <SettlementModal
-    close={() => setShowSettlement(false)}
-    settlements={settlements}
-  />
-)}
-      
-      {showDuckGuide && (
-        <DuckGuide
-          close={() => setShowDuckGuide(false)}
-          duckAssets={duckAssets}
-          basePath={basePath}
-        />
-      )}
-    </main>
-  );
-}
 
 function CategoryList({ items, max, currency }) {
   return (
