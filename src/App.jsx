@@ -63,32 +63,29 @@ function App() {
     month: "long",
   });
 
-  const [mainCurrency, setMainCurrency] = useState(() => {
-    return localStorage.getItem("main_currency") || "RM";
-  });
+  const [mainCurrency, setMainCurrency] = useState(
+    () => localStorage.getItem("main_currency") || "RM"
+  );
 
-  const [showSettlement, setShowSettlement] = useState(false);
-  
-  const [expenses, setExpenses] = useState(() => {
-    return JSON.parse(localStorage.getItem("guilty_expenses")) || [];
-  });
+  const [expenses, setExpenses] = useState(
+    () => JSON.parse(localStorage.getItem("guilty_expenses")) || []
+  );
 
-  const [friends, setFriends] = useState(() => {
-    return JSON.parse(localStorage.getItem("guilty_friends")) || ["Alex", "Ben"];
-  });
+  const [friends, setFriends] = useState(
+    () => JSON.parse(localStorage.getItem("guilty_friends")) || ["Alex", "Ben"]
+  );
 
-  const [splitBills, setSplitBills] = useState(() => {
-    return JSON.parse(localStorage.getItem("guilty_split_bills")) || [];
-  });
+  const [splitBills, setSplitBills] = useState(
+    () => JSON.parse(localStorage.getItem("guilty_split_bills")) || []
+  );
 
-  const [duck, setDuck] = useState(() => {
-    return (
+  const [duck, setDuck] = useState(
+    () =>
       JSON.parse(localStorage.getItem("guilty_duck")) || {
         xp: 0,
         level: 1,
       }
-    );
-  });
+  );
 
   const [tab, setTab] = useState("home");
   const [historyMode, setHistoryMode] = useState("all");
@@ -96,6 +93,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showDuckGuide, setShowDuckGuide] = useState(false);
+  const [showSettlement, setShowSettlement] = useState(false);
   const [newFriend, setNewFriend] = useState("");
 
   const [expenseForm, setExpenseForm] = useState({
@@ -110,6 +108,7 @@ function App() {
     title: "",
     amount: "",
     currency: mainCurrency,
+    category: "Friends",
     paidBy: "You",
     date: todayDate,
     splitType: "equal",
@@ -137,33 +136,121 @@ function App() {
     localStorage.setItem("guilty_duck", JSON.stringify(duck));
   }, [duck]);
 
-  const currentMonthExpenses = useMemo(() => {
+  const duckLevel = duck.level;
+  const duckStage = getDuckStage(duckLevel);
+  const duckXpInLevel = duck.xp % 100;
+  const duckAssets = getDuckAssets(duckLevel);
+  const basePath = `${import.meta.env.BASE_URL}ducks/`;
+
+  function rewardDuck(points) {
+    const newXp = duck.xp + points;
+    const newLevel = Math.floor(newXp / 100) + 1;
+    setDuck({ xp: newXp, level: newLevel });
+  }
+
+  function getMyShareFromSplitBill(bill) {
+    const amount = Number(bill.amount || 0);
+
+    if (bill.paidBy !== "You") {
+      const myDebt = bill.owes.find((item) => item.person === "You");
+      return myDebt ? Number(myDebt.amount || 0) : 0;
+    }
+
+    const friendsShare = bill.owes.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
+
+    return Math.max(amount - friendsShare, 0);
+  }
+
+  function getFriendsOweMe(currency) {
+    return splitBills
+      .filter((bill) => bill.currency === currency && bill.paidBy === "You")
+      .reduce((sum, bill) => {
+        const outstanding = bill.owes
+          .filter((item) => !item.settled)
+          .reduce((s, item) => s + Number(item.amount || 0), 0);
+
+        return sum + outstanding;
+      }, 0);
+  }
+
+  const currentMonthPersonalExpenses = useMemo(() => {
     return expenses.filter(
       (item) =>
         item.date.startsWith(currentMonth) && item.currency === mainCurrency
     );
   }, [expenses, currentMonth, mainCurrency]);
 
-  const historyMonthExpenses = useMemo(() => {
+  const currentMonthSplitExpenses = useMemo(() => {
+    return splitBills
+      .filter(
+        (bill) =>
+          bill.date.startsWith(currentMonth) && bill.currency === mainCurrency
+      )
+      .map((bill) => ({
+        id: `split-${bill.id}`,
+        amount: getMyShareFromSplitBill(bill),
+        currency: bill.currency,
+        category: bill.category || "Friends",
+        date: bill.date,
+        note: `Split: ${bill.title}`,
+        isSplit: true,
+      }))
+      .filter((item) => item.amount > 0);
+  }, [splitBills, currentMonth, mainCurrency]);
+
+  const currentMonthExpenses = [
+    ...currentMonthPersonalExpenses,
+    ...currentMonthSplitExpenses,
+  ];
+
+  const historyPersonalExpenses = useMemo(() => {
     return expenses.filter(
       (item) =>
         item.date.startsWith(selectedMonth) && item.currency === mainCurrency
     );
   }, [expenses, selectedMonth, mainCurrency]);
 
-  const filteredHistoryExpenses = useMemo(() => {
-    if (selectedCategory === "All") return historyMonthExpenses;
-    return historyMonthExpenses.filter((item) => item.category === selectedCategory);
-  }, [historyMonthExpenses, selectedCategory]);
+  const historySplitExpenses = useMemo(() => {
+    return splitBills
+      .filter(
+        (bill) =>
+          bill.date.startsWith(selectedMonth) && bill.currency === mainCurrency
+      )
+      .map((bill) => ({
+        id: `split-${bill.id}`,
+        amount: getMyShareFromSplitBill(bill),
+        currency: bill.currency,
+        category: bill.category || "Friends",
+        date: bill.date,
+        note: `Split: ${bill.title}`,
+        isSplit: true,
+      }))
+      .filter((item) => item.amount > 0);
+  }, [splitBills, selectedMonth, mainCurrency]);
 
-  const totalMonth = currentMonthExpenses.reduce((sum, item) => sum + item.amount, 0);
+  const historyMonthExpenses = [...historyPersonalExpenses, ...historySplitExpenses];
+
+  const filteredHistoryExpenses =
+    selectedCategory === "All"
+      ? historyMonthExpenses
+      : historyMonthExpenses.filter((item) => item.category === selectedCategory);
+
+  const totalMonth = currentMonthExpenses.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  );
+
   const dailyAverage = totalMonth / today.getDate();
+  const friendsOweMe = getFriendsOweMe(mainCurrency);
 
   const categoryTotals = categories
     .map((category) => {
       const total = currentMonthExpenses
         .filter((item) => item.category === category.name)
-        .reduce((sum, item) => sum + item.amount, 0);
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
       return { ...category, total };
     })
@@ -174,7 +261,7 @@ function App() {
     .map((category) => {
       const total = historyMonthExpenses
         .filter((item) => item.category === category.name)
-        .reduce((sum, item) => sum + item.amount, 0);
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
       return { ...category, total };
     })
@@ -184,18 +271,6 @@ function App() {
   const maxCategory = categoryTotals[0]?.total || 1;
   const maxHistoryCategory = historyCategoryTotals[0]?.total || 1;
   const recentExpenses = currentMonthExpenses.slice(0, 5);
-
-  const duckLevel = duck.level;
-  const duckStage = getDuckStage(duckLevel);
-  const duckXpInLevel = duck.xp % 100;
-  const duckAssets = getDuckAssets(duckLevel);
-  const basePath = "/guiltypleasure-expenses/ducks/";
-
-  function rewardDuck(points) {
-    const newXp = duck.xp + points;
-    const newLevel = Math.floor(newXp / 100) + 1;
-    setDuck({ xp: newXp, level: newLevel });
-  }
 
   function addExpense(e) {
     e.preventDefault();
@@ -226,14 +301,15 @@ function App() {
   }
 
   function deleteExpense(id) {
+    if (String(id).startsWith("split-")) return;
     setExpenses(expenses.filter((item) => item.id !== id));
   }
 
   function addFriend(e) {
     e.preventDefault();
-    const name = newFriend.trim();
 
-    if (!name || friends.includes(name)) return;
+    const name = newFriend.trim();
+    if (!name || friends.includes(name) || name === "You") return;
 
     setFriends([...friends, name]);
     setNewFriend("");
@@ -241,9 +317,12 @@ function App() {
 
   function deleteFriend(name) {
     setFriends(friends.filter((friend) => friend !== name));
+
     setSplitForm({
       ...splitForm,
-      selectedFriends: splitForm.selectedFriends.filter((friend) => friend !== name),
+      selectedFriends: splitForm.selectedFriends.filter(
+        (friend) => friend !== name
+      ),
       customRows: splitForm.customRows.filter((row) => row.name !== name),
     });
   }
@@ -281,14 +360,19 @@ function App() {
     let owes = [];
 
     if (splitForm.splitType === "equal") {
-      const peopleCount = splitForm.selectedFriends.length + 1;
-      const perPerson = amount / peopleCount;
+      const people = Array.from(
+        new Set([splitForm.paidBy, "You", ...splitForm.selectedFriends])
+      );
 
-      owes = splitForm.selectedFriends.map((friend) => ({
-        person: friend,
-        amount: perPerson,
-        settled: false,
-      }));
+      const perPerson = amount / people.length;
+
+      owes = people
+        .filter((person) => person !== splitForm.paidBy)
+        .map((person) => ({
+          person,
+          amount: perPerson,
+          settled: false,
+        }));
     }
 
     if (splitForm.splitType === "custom") {
@@ -316,6 +400,7 @@ function App() {
       title: splitForm.title.trim(),
       amount,
       currency: splitForm.currency,
+      category: splitForm.category,
       paidBy: splitForm.paidBy.trim(),
       date: splitForm.date,
       splitType: splitForm.splitType,
@@ -323,11 +408,13 @@ function App() {
     };
 
     setSplitBills([newBill, ...splitBills]);
+    rewardDuck(5);
 
     setSplitForm({
       title: "",
       amount: "",
       currency: mainCurrency,
+      category: "Friends",
       paidBy: "You",
       date: todayDate,
       splitType: "equal",
@@ -357,102 +444,68 @@ function App() {
     );
   }
 
-      function calculateSettlements() {
-  const balancesByCurrency = {};
+  function calculateSettlements() {
+    const balancesByCurrency = {};
 
-  splitBills.forEach((bill) => {
-    const currency = bill.currency || "RM";
+    splitBills.forEach((bill) => {
+      const currency = bill.currency || "RM";
 
-    if (!balancesByCurrency[currency]) {
-      balancesByCurrency[currency] = {};
-    }
-
-    bill.owes.forEach((item) => {
-      if (item.settled) return;
-
-      const payer = bill.paidBy;
-      const debtor = item.person;
-      const amount = Number(item.amount || 0);
-
-      balancesByCurrency[currency][payer] =
-        (balancesByCurrency[currency][payer] || 0) + amount;
-
-      balancesByCurrency[currency][debtor] =
-        (balancesByCurrency[currency][debtor] || 0) - amount;
-    });
-  });
-
-  const settlements = [];
-
-  Object.entries(balancesByCurrency).forEach(([currency, balances]) => {
-    const creditors = [];
-    const debtors = [];
-
-    Object.entries(balances).forEach(([person, amount]) => {
-      if (amount > 0.01) {
-        creditors.push({ person, amount });
+      if (!balancesByCurrency[currency]) {
+        balancesByCurrency[currency] = {};
       }
 
-      if (amount < -0.01) {
-        debtors.push({ person, amount: Math.abs(amount) });
-      }
+      bill.owes.forEach((item) => {
+        if (item.settled) return;
+
+        const payer = bill.paidBy;
+        const debtor = item.person;
+        const amount = Number(item.amount || 0);
+
+        balancesByCurrency[currency][payer] =
+          (balancesByCurrency[currency][payer] || 0) + amount;
+
+        balancesByCurrency[currency][debtor] =
+          (balancesByCurrency[currency][debtor] || 0) - amount;
+      });
     });
 
-    let i = 0;
-    let j = 0;
+    const settlements = [];
 
-    while (i < debtors.length && j < creditors.length) {
-      const payment = Math.min(debtors[i].amount, creditors[j].amount);
+    Object.entries(balancesByCurrency).forEach(([currency, balances]) => {
+      const creditors = [];
+      const debtors = [];
 
-      settlements.push({
-        from: debtors[i].person,
-        to: creditors[j].person,
-        amount: payment,
-        currency,
+      Object.entries(balances).forEach(([person, amount]) => {
+        if (amount > 0.01) creditors.push({ person, amount });
+        if (amount < -0.01) debtors.push({ person, amount: Math.abs(amount) });
       });
 
-      debtors[i].amount -= payment;
-      creditors[j].amount -= payment;
+      let i = 0;
+      let j = 0;
 
-      if (debtors[i].amount <= 0.01) i++;
-      if (creditors[j].amount <= 0.01) j++;
-    }
-  });
+      while (i < debtors.length && j < creditors.length) {
+        const payment = Math.min(debtors[i].amount, creditors[j].amount);
 
-  return settlements;
-}
-
-      const settlements = calculateSettlements();
-
-      splitBills.forEach((bill) => {
-        bill.owes.forEach((item) => {
-          if (item.settled) return;
-
-            const currency = bill.currency || "RM";
-            const payer = bill.paidBy;
-            const person = item.person;
-            const amount = Number(item.amount || 0);
-
-            if (!balances[currency]) {
-              balances[currency] = {};
-            }
-
-            if (!balances[currency][person]) {
-              balances[currency][person] = 0;
-            }
-
-            if (!balances[currency][payer]) {
-              balances[currency][payer] = 0;
-            }
-
-            balances[currency][person] -= amount;
-            balances[currency][payer] += amount;
-          });
+        settlements.push({
+          from: debtors[i].person,
+          to: creditors[j].person,
+          amount: payment,
+          currency,
         });
 
-      return balances;
+        debtors[i].amount -= payment;
+        creditors[j].amount -= payment;
+
+        if (debtors[i].amount <= 0.01) i++;
+        if (creditors[j].amount <= 0.01) j++;
       }
-  
+    });
+
+    return settlements;
+  }
+
+  const settlements = calculateSettlements();
+
   return (
     <main className="app">
       <header className="top-header">
@@ -476,46 +529,36 @@ function App() {
             ))}
           </div>
 
-      {showSettlement && (
-  <SettlementModal
-    close={() => setShowSettlement(false)}
-    settlements={settlements}
-  />
-)}
-      
-      {showDuckGuide && (
-        <DuckGuide
-          close={() => setShowDuckGuide(false)}
-          duckAssets={duckAssets}
-          basePath={basePath}
-        />
-      )}
-    </main>
-  );
-}
-          
-         <section className="duck-card">
-           <div className="duck-face animated-duck">
-            <div className="duck-wrapper">
-              <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
-
-              <div className="eye-lid left"></div>
-              <div className="eye-lid right"></div>
+          <section className="duck-card">
+            <div className="duck-face animated-duck">
+              <div className="duck-wrapper">
+                <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
+                <div className="eye-lid left"></div>
+                <div className="eye-lid right"></div>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <strong>{duckStage}</strong>
-            <p>Lv. {duckLevel} · XP {duckXpInLevel}/100</p>
-          </div>
+            <div>
+              <strong>{duckStage}</strong>
+              <p>
+                Lv. {duckLevel} · XP {duckXpInLevel}/100
+              </p>
+            </div>
 
-          <button onClick={() => setShowDuckGuide(true)}>evolution</button>
-        </section>
+            <button onClick={() => setShowDuckGuide(true)}>evolution</button>
+          </section>
 
           <section className="hero-card">
             <p className="overline">Expenses This Month</p>
             <h1>{formatMoney(totalMonth, mainCurrency)}</h1>
             <span>~ {formatMoney(dailyAverage, mainCurrency)} / day</span>
+          </section>
+
+          <section className="section-card">
+            <div className="section-title">
+              <h2>Friends Owe You</h2>
+            </div>
+            <h2>{formatMoney(friendsOweMe, mainCurrency)}</h2>
           </section>
 
           <section className="section-card">
@@ -553,7 +596,7 @@ function App() {
           <div className="section-title">
             <h2>Split</h2>
           </div>
-        
+
           <form className="friend-form" onSubmit={addFriend}>
             <input
               placeholder="Add friend name"
@@ -592,7 +635,9 @@ function App() {
             <input
               placeholder="Bill title"
               value={splitForm.title}
-              onChange={(e) => setSplitForm({ ...splitForm, title: e.target.value })}
+              onChange={(e) =>
+                setSplitForm({ ...splitForm, title: e.target.value })
+              }
             />
 
             <input
@@ -604,14 +649,16 @@ function App() {
               onChange={(e) =>
                 setSplitForm({
                   ...splitForm,
-                  amount: e.target.value.replace(/[^0-9.]/g, "")
+                  amount: e.target.value.replace(/[^0-9.]/g, ""),
                 })
               }
             />
 
             <select
               value={splitForm.currency}
-              onChange={(e) => setSplitForm({ ...splitForm, currency: e.target.value })}
+              onChange={(e) =>
+                setSplitForm({ ...splitForm, currency: e.target.value })
+              }
             >
               {currencies.map((currency) => (
                 <option key={currency}>{currency}</option>
@@ -619,26 +666,37 @@ function App() {
             </select>
 
             <select
+              value={splitForm.category}
+              onChange={(e) =>
+                setSplitForm({ ...splitForm, category: e.target.value })
+              }
+            >
+              {categories.map((category) => (
+                <option key={category.name} value={category.name}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+
+            <select
               value={splitForm.paidBy}
               onChange={(e) =>
-                setSplitForm({
-                  ...splitForm,
-                  paidBy: e.target.value,
-                })
+                setSplitForm({ ...splitForm, paidBy: e.target.value })
               }
             >
               <option value="You">You</option>
-
               {friends.map((friend) => (
-                 <option key={friend} value={friend}>
+                <option key={friend} value={friend}>
                   {friend}
                 </option>
               ))}
             </select>
-          <>
+
             <div
               className="date-pill-field"
-              onClick={() => document.getElementById("split-date-picker").showPicker?.()}
+              onClick={() =>
+                document.getElementById("split-date-picker").showPicker?.()
+              }
             >
               <CalendarDaysIcon />
               <span>
@@ -656,13 +714,9 @@ function App() {
               type="date"
               value={splitForm.date}
               onChange={(e) =>
-                setSplitForm({
-                  ...splitForm,
-                  date: e.target.value,
-                })
+                setSplitForm({ ...splitForm, date: e.target.value })
               }
             />
-          </>
 
             <div className="segmented-split">
               {["equal", "custom", "percentage"].map((type) => (
@@ -682,18 +736,28 @@ function App() {
               <div className="custom-split">
                 <p className="hint">
                   {splitForm.splitType === "custom"
-                    ? "Choose who owes you how much."
-                    : "Enter each selected friend’s percentage."}
+                    ? "Choose who owes who how much."
+                    : "Enter each selected person’s percentage."}
                 </p>
 
                 {splitForm.customRows.map((row) => (
                   <div className="custom-row" key={row.name}>
                     <span>{row.name}</span>
                     <input
-                      type="number"
-                      placeholder={splitForm.splitType === "custom" ? splitForm.currency : "%"}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder={
+                        splitForm.splitType === "custom"
+                          ? splitForm.currency
+                          : "%"
+                      }
                       value={row.value}
-                      onChange={(e) => updateCustomValue(row.name, e.target.value)}
+                      onChange={(e) =>
+                        updateCustomValue(
+                          row.name,
+                          e.target.value.replace(/[^0-9.]/g, "")
+                        )
+                      }
                     />
                   </div>
                 ))}
@@ -717,19 +781,28 @@ function App() {
                     </p>
                   </div>
 
-                  <button className="delete-btn" onClick={() => deleteSplitBill(bill.id)}>
+                  <button
+                    className="delete-btn"
+                    onClick={() => deleteSplitBill(bill.id)}
+                  >
                     <TrashIcon />
                   </button>
                 </div>
 
                 {bill.owes.map((item) => (
-                  <div className={item.settled ? "owe-line settled" : "owe-line"} key={item.person}>
+                  <div
+                    className={item.settled ? "owe-line settled" : "owe-line"}
+                    key={item.person}
+                  >
                     <span>
                       {item.person} owes {bill.paidBy}{" "}
                       <b>{formatMoney(item.amount, bill.currency)}</b>
                     </span>
 
-                    <button type="button" onClick={() => toggleSettled(bill.id, item.person)}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSettled(bill.id, item.person)}
+                    >
                       <CheckCircleIcon />
                     </button>
                   </div>
@@ -746,19 +819,25 @@ function App() {
             <h2>History</h2>
           </div>
 
-        <div className="month-input-wrap">
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-          />
-        </div>
+          <div className="month-input-wrap">
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
 
           <div className="segmented-history">
-            <button className={historyMode === "all" ? "active" : ""} onClick={() => setHistoryMode("all")}>
+            <button
+              className={historyMode === "all" ? "active" : ""}
+              onClick={() => setHistoryMode("all")}
+            >
               all
             </button>
-            <button className={historyMode === "category" ? "active" : ""} onClick={() => setHistoryMode("category")}>
+            <button
+              className={historyMode === "category" ? "active" : ""}
+              onClick={() => setHistoryMode("category")}
+            >
               category
             </button>
           </div>
@@ -769,13 +848,10 @@ function App() {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                <option>All</option>
-
-                {categories.map((category) => (
-                  <option key={category.name}>
-                    {category.name}
-                    </option>
+                >
+                  <option>All</option>
+                  {categories.map((category) => (
+                    <option key={category.name}>{category.name}</option>
                   ))}
                 </select>
               </div>
@@ -783,7 +859,10 @@ function App() {
               {filteredHistoryExpenses.length === 0 ? (
                 <p className="empty">No matching expenses.</p>
               ) : (
-                <TransactionList items={filteredHistoryExpenses} onDelete={deleteExpense} />
+                <TransactionList
+                  items={filteredHistoryExpenses}
+                  onDelete={deleteExpense}
+                />
               )}
             </>
           )}
@@ -804,30 +883,39 @@ function App() {
         </section>
       )}
 
-{tab === "split" ? (
-  <button
-    className="record-button"
-    onClick={() => setShowSettlement(true)}
-  >
-    Balance
-  </button>
-) : tab === "home" ? (
-  <button
-    className="record-button"
-    onClick={() => setShowExpenseModal(true)}
-  >
-    ◉ Record
-  </button>
-) : null}}
+      {tab === "split" ? (
+        <button
+          className="record-button"
+          onClick={() => setShowSettlement(true)}
+        >
+          Balance
+        </button>
+      ) : tab === "home" ? (
+        <button
+          className="record-button"
+          onClick={() => setShowExpenseModal(true)}
+        >
+          ◉ Record
+        </button>
+      ) : null}
 
       <nav className="bottom-nav">
-        <button className={tab === "home" ? "active" : ""} onClick={() => setTab("home")}>
+        <button
+          className={tab === "home" ? "active" : ""}
+          onClick={() => setTab("home")}
+        >
           <HomeIcon />
         </button>
-        <button className={tab === "split" ? "active" : ""} onClick={() => setTab("split")}>
+        <button
+          className={tab === "split" ? "active" : ""}
+          onClick={() => setTab("split")}
+        >
           <UserGroupIcon />
         </button>
-        <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
+        <button
+          className={tab === "history" ? "active" : ""}
+          onClick={() => setTab("history")}
+        >
           <ClockIcon />
         </button>
       </nav>
@@ -840,6 +928,24 @@ function App() {
           save={addExpense}
         />
       )}
+
+      {showSettlement && (
+        <SettlementModal
+          close={() => setShowSettlement(false)}
+          settlements={settlements}
+        />
+      )}
+
+      {showDuckGuide && (
+        <DuckGuide
+          close={() => setShowDuckGuide(false)}
+          duckAssets={duckAssets}
+          basePath={basePath}
+        />
+      )}
+    </main>
+  );
+}
 
 function CategoryList({ items, max, currency }) {
   return (
@@ -893,9 +999,11 @@ function TransactionList({ items, onDelete }) {
 
             <div className="amount-side">
               <b>-{formatMoney(item.amount, item.currency || "RM")}</b>
-              <button className="delete-btn" onClick={() => onDelete(item.id)}>
-                <TrashIcon />
-              </button>
+              {!item.isSplit && (
+                <button className="delete-btn" onClick={() => onDelete(item.id)}>
+                  <TrashIcon />
+                </button>
+              )}
             </div>
           </div>
         );
@@ -924,7 +1032,11 @@ function ExpenseModal({ form, setForm, close, save }) {
                 <button
                   type="button"
                   key={category.name}
-                  className={form.category === category.name ? "category-btn active" : "category-btn"}
+                  className={
+                    form.category === category.name
+                      ? "category-btn active"
+                      : "category-btn"
+                  }
                   onClick={() => setForm({ ...form, category: category.name })}
                 >
                   <Icon />
@@ -943,47 +1055,49 @@ function ExpenseModal({ form, setForm, close, save }) {
             onChange={(e) =>
               setForm({
                 ...form,
-                amount: e.target.value.replace(/[^0-9.]/g, "")
+                amount: e.target.value.replace(/[^0-9.]/g, ""),
               })
             }
           />
 
-          <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+          <select
+            value={form.currency}
+            onChange={(e) => setForm({ ...form, currency: e.target.value })}
+          >
             {currencies.map((currency) => (
               <option key={currency}>{currency}</option>
             ))}
           </select>
 
-          <>
-            <div
-              className="date-pill-field"
-              onClick={() => document.getElementById("expense-date-picker").showPicker?.()}
-            >
-              <CalendarDaysIcon />
-              <span>
-                {new Date(form.date).toLocaleDateString("en-MY", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
+          <div
+            className="date-pill-field"
+            onClick={() =>
+              document.getElementById("expense-date-picker").showPicker?.()
+            }
+          >
+            <CalendarDaysIcon />
+            <span>
+              {new Date(form.date).toLocaleDateString("en-MY", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
+          </div>
 
-            <input
-              id="expense-date-picker"
-              className="hidden-date-input"
-              type="date"
-              value={form.date}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  date: e.target.value,
-                })
-              }
-            />
-        </>
+          <input
+            id="expense-date-picker"
+            className="hidden-date-input"
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+          />
 
-          <input placeholder="Note" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+          <input
+            placeholder="Note"
+            value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+          />
 
           <button className="save-btn" type="submit">
             save expense
@@ -1001,6 +1115,7 @@ function DuckGuide({ close, duckAssets, basePath }) {
         <div className="duck-room">
           <img src={`${basePath}${duckAssets.room}`} alt="Duck room" />
         </div>
+
         <div className="modal-head">
           <h2>Duck Evolution</h2>
           <button className="delete-btn" onClick={close}>
@@ -1009,55 +1124,51 @@ function DuckGuide({ close, duckAssets, basePath }) {
         </div>
 
         <div className="duck-guide">
-          <p><b>Duckling</b> · Start tracking expenses.</p>
-          <p><b>Traveller Duck</b> · Reach Lv.5 or record travel spending.</p>
-          <p><b>Collector Duck</b> · Reach Lv.10 and settle friend debts.</p>
-          <p><b>Merchant Duck</b> · Reach Lv.20 through consistent tracking.</p>
-          <p><b>Tycoon Duck</b> · Reach Lv.30. Tiny duck empire achieved.</p>
-          <p className="hint">Expense +5 XP · Travel +8 XP · Settled debt +10 XP</p>
+          <p>
+            <b>Duckling</b> · Start tracking expenses.
+          </p>
+          <p>
+            <b>Traveller Duck</b> · Reach Lv.5 or record travel spending.
+          </p>
+          <p>
+            <b>Collector Duck</b> · Reach Lv.10 and settle friend debts.
+          </p>
+          <p>
+            <b>Merchant Duck</b> · Reach Lv.20 through consistent tracking.
+          </p>
+          <p>
+            <b>Tycoon Duck</b> · Reach Lv.30. Tiny duck empire achieved.
+          </p>
+          <p className="hint">
+            Expense +5 XP · Split bill +5 XP · Travel +8 XP · Settled debt +10 XP
+          </p>
         </div>
       </section>
     </div>
   );
 }
 
-function SettlementModal({
-  close,
-  settlements,
-}) {
+function SettlementModal({ close, settlements }) {
   return (
     <div className="modal-backdrop">
       <section className="modal">
         <div className="modal-head">
           <h2>Settlement</h2>
-
-          <button
-            className="delete-btn"
-            onClick={close}
-          >
+          <button className="delete-btn" onClick={close}>
             <XMarkIcon />
           </button>
         </div>
 
-        <div className="duck-guide">
+        <div className="settlement-list">
           {settlements.length === 0 ? (
-            <p>No outstanding balances.</p>
+            <p className="empty">No outstanding balances.</p>
           ) : (
             settlements.map((item, index) => (
-              <div
-                key={index}
-                className="settlement-row"
-              >
+              <div className="settlement-row" key={index}>
                 <span>
                   {item.from} → {item.to}
                 </span>
-
-                <b>
-                  {formatMoney(
-                    item.amount,
-                    item.currency
-                  )}
-                </b>
+                <b>{formatMoney(item.amount, item.currency)}</b>
               </div>
             ))
           )}
