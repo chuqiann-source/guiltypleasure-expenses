@@ -627,7 +627,7 @@ function App() {
         ))
     )
   )}
-</section
+</section>
           
           <form className="friend-form" onSubmit={addFriend}>
             <input
