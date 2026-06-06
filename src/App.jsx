@@ -1056,7 +1056,6 @@ function ExpenseModal({ form, setForm, close, save }) {
           <input
             type="text"
             inputMode="numeric"
-            pattern="[0-9]*"
             placeholder="0.00"
             value={form.amount}
             onChange={(e) =>
@@ -1067,6 +1066,19 @@ function ExpenseModal({ form, setForm, close, save }) {
             }
           />
 
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="0.00"
+            value={form.amount}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                amount: formatCentsInput(e.target.value),
+              })
+            }
+          />
+          
           <select
             value={form.currency}
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
