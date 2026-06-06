@@ -36,12 +36,17 @@ function formatMoney(amount, currency = "RM") {
   return `${currency} ${Number(amount || 0).toFixed(2)}`;
 }
 
+function formatCentsInput(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits ? (Number(digits) / 100).toFixed(2) : "";
+}
+
 function getDuckStage(level) {
-  if (level >= 30) return "Tycoon Duck";
+  if (level >= 30) return "Duck King";
   if (level >= 20) return "Merchant Duck";
-  if (level >= 10) return "Collector Duck";
-  if (level >= 5) return "Traveller Duck";
-  return "Duckling";
+  if (level >= 10) return "Miner Duck";
+  if (level >= 5) return "Explorer Duck";
+  return "Baby Duck";
 }
 
 function getDuckAssets(level) {
@@ -342,10 +347,15 @@ function App() {
   }
 
   function updateCustomValue(name, value) {
+    const clean =
+      splitForm.splitType === "percentage"
+        ? String(value || "").replace(/\D/g, "")
+        : formatCentsInput(value);
+
     setSplitForm({
       ...splitForm,
       customRows: splitForm.customRows.map((row) =>
-        row.name === name ? { ...row, value } : row
+        row.name === name ? { ...row, value: clean } : row
       ),
     });
   }
@@ -541,15 +551,15 @@ function App() {
             <div>
               <strong>{duckStage}</strong>
               <p>
-                Lv. {duckLevel} · XP {duckXpInLevel}/100
+                LV {duckLevel} · XP {duckXpInLevel}/100
               </p>
             </div>
 
-            <button onClick={() => setShowDuckGuide(true)}>evolution</button>
+            <button onClick={() => setShowDuckGuide(true)}>evolve</button>
           </section>
 
           <section className="hero-card">
-            <p className="overline">Expenses This Month</p>
+            <p className="overline">This Month</p>
             <h1>{formatMoney(totalMonth, mainCurrency)}</h1>
             <span>~ {formatMoney(dailyAverage, mainCurrency)} / day</span>
           </section>
@@ -557,20 +567,19 @@ function App() {
           {friendsOweMe > 0 && (
             <section className="section-card owe-card">
               <div className="section-title">
-              <h2>Friends Owe You</h2>
-            </div>
-
-            <h2>{formatMoney(friendsOweMe, mainCurrency)}</h2>
-          </section>
-        )}
+                <h2>Friends Owe You</h2>
+              </div>
+              <h2>{formatMoney(friendsOweMe, mainCurrency)}</h2>
+            </section>
+          )}
 
           <section className="section-card">
             <div className="section-title">
-              <h2>By Category</h2>
+              <h2>Loot by Category</h2>
             </div>
 
             {categoryTotals.length === 0 ? (
-              <p className="empty">No guilty pleasures recorded.</p>
+              <p className="empty">No loot spent yet.</p>
             ) : (
               <CategoryList
                 items={categoryTotals.slice(0, 3)}
@@ -582,11 +591,11 @@ function App() {
 
           <section className="section-card">
             <div className="section-title">
-              <h2>Recent</h2>
+              <h2>Recent Drops</h2>
             </div>
 
             {recentExpenses.length === 0 ? (
-              <p className="empty">A surprisingly responsible month.</p>
+              <p className="empty">A suspiciously peaceful month.</p>
             ) : (
               <TransactionList items={recentExpenses} onDelete={deleteExpense} />
             )}
@@ -597,12 +606,12 @@ function App() {
       {tab === "split" && (
         <section className="section-card page-card">
           <div className="section-title">
-            <h2>Split</h2>
+            <h2>Party Split</h2>
           </div>
 
           <form className="friend-form" onSubmit={addFriend}>
             <input
-              placeholder="Add friend name"
+              placeholder="Add player name"
               value={newFriend}
               onChange={(e) => setNewFriend(e.target.value)}
             />
@@ -645,14 +654,14 @@ function App() {
 
             <input
               type="text"
-              inputMode="decimal"
+              inputMode="numeric"
               enterKeyHint="done"
-              placeholder="Total amount"
+              placeholder="0.00"
               value={splitForm.amount}
               onChange={(e) =>
                 setSplitForm({
                   ...splitForm,
-                  amount: e.target.value.replace(/[^0-9.]/g, ""),
+                  amount: formatCentsInput(e.target.value),
                 })
               }
             />
@@ -739,8 +748,8 @@ function App() {
               <div className="custom-split">
                 <p className="hint">
                   {splitForm.splitType === "custom"
-                    ? "Choose who owes who how much."
-                    : "Enter each selected person’s percentage."}
+                    ? "Enter each player's amount."
+                    : "Enter each player's percentage."}
                 </p>
 
                 {splitForm.customRows.map((row) => (
@@ -748,19 +757,14 @@ function App() {
                     <span>{row.name}</span>
                     <input
                       type="text"
-                      inputMode="decimal"
+                      inputMode="numeric"
                       placeholder={
                         splitForm.splitType === "custom"
-                          ? splitForm.currency
+                          ? "0.00"
                           : "%"
                       }
                       value={row.value}
-                      onChange={(e) =>
-                        updateCustomValue(
-                          row.name,
-                          e.target.value.replace(/[^0-9.]/g, "")
-                        )
-                      }
+                      onChange={(e) => updateCustomValue(row.name, e.target.value)}
                     />
                   </div>
                 ))}
@@ -819,7 +823,7 @@ function App() {
       {tab === "history" && (
         <section className="section-card page-card">
           <div className="section-title">
-            <h2>History</h2>
+            <h2>Archive</h2>
           </div>
 
           <div className="month-input-wrap">
@@ -898,7 +902,7 @@ function App() {
           className="record-button"
           onClick={() => setShowExpenseModal(true)}
         >
-          ◉ Record
+          + Record
         </button>
       ) : null}
 
@@ -1051,14 +1055,14 @@ function ExpenseModal({ form, setForm, close, save }) {
 
           <input
             type="text"
-            inputMode="decimal"
+            inputMode="numeric"
             pattern="[0-9]*"
-            placeholder="Amount"
+            placeholder="0.00"
             value={form.amount}
             onChange={(e) =>
               setForm({
                 ...form,
-                amount: e.target.value.replace(/[^0-9.]/g, ""),
+                amount: formatCentsInput(e.target.value),
               })
             }
           />
@@ -1127,21 +1131,11 @@ function DuckGuide({ close, duckAssets, basePath }) {
         </div>
 
         <div className="duck-guide">
-          <p>
-            <b>Duckling</b> · Start tracking expenses.
-          </p>
-          <p>
-            <b>Traveller Duck</b> · Reach Lv.5 or record travel spending.
-          </p>
-          <p>
-            <b>Collector Duck</b> · Reach Lv.10 and settle friend debts.
-          </p>
-          <p>
-            <b>Merchant Duck</b> · Reach Lv.20 through consistent tracking.
-          </p>
-          <p>
-            <b>Tycoon Duck</b> · Reach Lv.30. Tiny duck empire achieved.
-          </p>
+          <p><b>Baby Duck</b> · Start tracking expenses.</p>
+          <p><b>Explorer Duck</b> · Reach LV 5.</p>
+          <p><b>Miner Duck</b> · Reach LV 10 and settle debts.</p>
+          <p><b>Merchant Duck</b> · Reach LV 20 through consistent tracking.</p>
+          <p><b>Duck King</b> · Reach LV 30. Emerald empire achieved.</p>
           <p className="hint">
             Expense +5 XP · Split bill +5 XP · Travel +8 XP · Settled debt +10 XP
           </p>
