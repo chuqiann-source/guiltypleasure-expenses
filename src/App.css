@@ -127,6 +127,21 @@ svg {
   white-space: nowrap;
 }
 
+.owe-card {
+  background: #efe1c8;
+  border-color: #b88a5a;
+}
+
+.owe-card h2 {
+  color: #4a2f18;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.owe-card .section-title h2 {
+  color: #6c4a2d;
+}
+
 .split-balance-row button {
   border: none;
   border-radius: 999px;
