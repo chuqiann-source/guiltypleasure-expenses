@@ -554,12 +554,15 @@ function App() {
             <span>~ {formatMoney(dailyAverage, mainCurrency)} / day</span>
           </section>
 
-          <section className="section-card">
-            <div className="section-title">
+          {friendsOweMe > 0 && (
+            <section className="section-card owe-card">
+              <div className="section-title">
               <h2>Friends Owe You</h2>
             </div>
+
             <h2>{formatMoney(friendsOweMe, mainCurrency)}</h2>
           </section>
+        )}
 
           <section className="section-card">
             <div className="section-title">
