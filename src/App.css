@@ -79,14 +79,6 @@ svg {
   color: var(--deep);
 }
 
-.segmented-history,
-.segmented-split {
-  background: var(--soft);
-  border-radius: 15px;
-  padding: 4px;
-  gap: 4px;
-}
-
 .segmented-history {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -882,6 +874,8 @@ select:focus {
   position: absolute;
   opacity: 0;
   pointer-events: none;
+  width: 1px;
+  height: 1px;
 }
 
 .settlement-list {
