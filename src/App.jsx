@@ -597,6 +597,38 @@ function App() {
             <h2>Split</h2>
           </div>
 
+<section className="split-balance-box">
+  <strong>Outstanding Balances</strong>
+
+  {splitBills.every((bill) => bill.owes.every((item) => item.settled)) ? (
+    <p className="empty">No outstanding balances.</p>
+  ) : (
+    splitBills.map((bill) =>
+      bill.owes
+        .filter((item) => !item.settled)
+        .map((item) => (
+          <div className="split-balance-row" key={`${bill.id}-${item.person}`}>
+            <div>
+              <span>
+                {item.person} → {bill.paidBy}
+              </span>
+              <p>{bill.title}</p>
+            </div>
+
+            <b>{formatMoney(item.amount, bill.currency)}</b>
+
+            <button
+              type="button"
+              onClick={() => toggleSettled(bill.id, item.person)}
+            >
+              settle
+            </button>
+          </div>
+        ))
+    )
+  )}
+</section
+          
           <form className="friend-form" onSubmit={addFriend}>
             <input
               placeholder="Add friend name"
