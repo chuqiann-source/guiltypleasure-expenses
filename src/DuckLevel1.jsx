@@ -137,3 +137,6 @@
   <!-- ACCESSORY: intentionally empty for Level 1 base character -->
   <g id="accessory"></g>
 </svg>
+
+export default DuckLevel1;
+    
