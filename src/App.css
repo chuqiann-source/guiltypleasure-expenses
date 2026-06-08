@@ -200,6 +200,100 @@ svg {
   animation: duck-bob 2.4s ease-in-out infinite;
 }
 
+.duck-level-wrap {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.duck-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  image-rendering: pixelated;
+}
+
+.duck-svg #body {
+  animation: duck-body-bob 2.4s ease-in-out infinite;
+  transform-origin: center bottom;
+  transform-box: fill-box;
+}
+
+.duck-svg #head {
+  animation: duck-head-bob 2.4s ease-in-out infinite;
+  transform-origin: center bottom;
+  transform-box: fill-box;
+}
+
+.duck-svg #left-wing {
+  animation: duck-wing-flap 2.4s ease-in-out infinite;
+  transform-origin: right center;
+  transform-box: fill-box;
+}
+
+.duck-svg #right-wing {
+  animation: duck-wing-flap-right 2.4s ease-in-out infinite;
+  transform-origin: left center;
+  transform-box: fill-box;
+}
+
+.duck-svg #beak {
+  animation: duck-beak-twitch 5s ease-in-out infinite;
+  transform-origin: center center;
+  transform-box: fill-box;
+}
+
+@keyframes duck-body-bob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes duck-head-bob {
+  0%, 100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+
+  50% {
+    transform: translateY(-12px) rotate(1deg);
+  }
+}
+
+@keyframes duck-wing-flap {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(-5deg);
+  }
+}
+
+@keyframes duck-wing-flap-right {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes duck-beak-twitch {
+  0%, 92%, 100% {
+    transform: scaleY(1);
+  }
+
+  95% {
+    transform: scaleY(0.85);
+  }
+}
+
 @keyframes duck-bob {
   0%,
   100% {
