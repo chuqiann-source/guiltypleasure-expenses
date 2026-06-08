@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import DuckLevel1 from "./DuckLevel1";
 
 import {
   CakeIcon,
@@ -542,7 +543,11 @@ function App() {
           <section className="duck-card">
             <div className="duck-face animated-duck">
               <div className="duck-wrapper">
+                {duckLevel < 5 ? (
+              <DuckLevel1 />
+              ) : (
                 <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
+            )}
                 <div className="eye-lid left"></div>
                 <div className="eye-lid right"></div>
               </div>
