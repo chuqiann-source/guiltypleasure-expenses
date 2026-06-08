@@ -200,6 +200,109 @@ svg {
   animation: duck-bob 2.4s ease-in-out infinite;
 }
 
+.duck-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+#body {
+  transform-origin: center bottom;
+  transform-box: fill-box;
+  animation: duckBody 2.5s ease-in-out infinite;
+}
+
+#head {
+  transform-origin: center bottom;
+  transform-box: fill-box;
+  animation: duckHead 2.5s ease-in-out infinite;
+}
+
+#left-wing {
+  transform-origin: right center;
+  transform-box: fill-box;
+  animation: leftWing 2.5s ease-in-out infinite;
+}
+
+#right-wing {
+  transform-origin: left center;
+  transform-box: fill-box;
+  animation: rightWing 2.5s ease-in-out infinite;
+}
+
+#beak {
+  transform-origin: center center;
+  transform-box: fill-box;
+  animation: beakTwitch 6s ease-in-out infinite;
+}
+
+#left-eye,
+#right-eye {
+  transform-origin: center center;
+  transform-box: fill-box;
+  animation: blink 7s infinite;
+}
+
+@keyframes duckBody {
+  0%,100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes duckHead {
+  0%,100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+@keyframes leftWing {
+  0%,100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(-5deg);
+  }
+}
+
+@keyframes rightWing {
+  0%,100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes beakTwitch {
+  0%,95%,100% {
+    transform: scaleY(1);
+  }
+
+  97% {
+    transform: scaleY(0.9);
+  }
+}
+
+@keyframes blink {
+  0%,94%,100% {
+    transform: scaleY(1);
+  }
+
+  96%,98% {
+    transform: scaleY(0.08);
+  }
+}
+
 .duck-level-wrap {
   width: 100%;
   height: 100%;
