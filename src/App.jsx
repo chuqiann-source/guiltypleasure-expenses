@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import DuckLevel1 from "./DuckLevel1".jsx;
+import DuckLevel1 from "./DuckLevel1";
 
 import {
   CakeIcon,
