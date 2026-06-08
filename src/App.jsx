@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import DuckLevel1 from "./DuckLevel1";
+import DuckLevel1 from "./DuckLevel1.jsx";
 
 import {
   CakeIcon,
@@ -542,25 +542,27 @@ function App() {
 
           <section className="duck-card">
             <div className="duck-face animated-duck">
-              <div className="duck-wrapper">
-                {duckLevel < 5 ? (
-              <DuckLevel1 />
+              {duckLevel < 5 ? (
+                <DuckLevel1 />
               ) : (
-                <img src={`${basePath}${duckAssets.duck}`} alt={duckStage} />
-            )}
-                <div className="eye-lid left"></div>
-                <div className="eye-lid right"></div>
-              </div>
+               <img
+                  src={`${basePath}${duckAssets.duck}`}
+                  alt={duckStage}
+                />
+              )}
             </div>
 
             <div>
               <strong>{duckStage}</strong>
-              <p>
-                LV {duckLevel} · XP {duckXpInLevel}/100
-              </p>
-            </div>
 
-            <button onClick={() => setShowDuckGuide(true)}>evolve</button>
+                <p>
+                  LV {duckLevel} · XP {duckXpInLevel}/100
+                </p>
+              </div>
+
+            <button onClick={() => setShowDuckGuide(true)}>
+              evolve
+            </button>
           </section>
 
           <section className="hero-card">
