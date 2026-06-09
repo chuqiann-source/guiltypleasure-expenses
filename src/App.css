@@ -56,10 +56,6 @@ svg {
   padding: 18px 14px 150px;
 }
 
-.app-shell {
-  min-height: 100dvh;
-}
-
 .top-header {
   display: flex;
   justify-content: flex-end;
