@@ -53,7 +53,7 @@ svg {
   max-width: 430px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 18px 14px 108px;
+  padding: 18px 14px 140px;
 }
 
 .top-header {
@@ -407,11 +407,11 @@ svg {
 }
 
 .page-card {
-  height: calc(100vh - 220px);
+  min-height: auto;
   display: grid;
   gap: 10px;
   align-content: start;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .section-title {
@@ -542,7 +542,7 @@ svg {
   color: #102815;
   font-size: 12px;
   font-weight: 900;
-  padding: 13px 18px;
+  padding: 10px 16px;
   z-index: 12;
   text-transform: uppercase;
   box-shadow:
@@ -580,11 +580,9 @@ svg {
 }
 
 .bottom-nav .active {
-  background: rgba(85, 201, 94, 0.15);
-
-  border-top: 3px solid #55c95e;
-
   color: #55c95e;
+  border-top: 3px solid #55c95e;
+  background: transparent;
 }
 
 .modal-backdrop {
