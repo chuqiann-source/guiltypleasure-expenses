@@ -555,9 +555,21 @@ function App() {
             <div>
               <strong>{duckStage}</strong>
 
-                <p>
-                  LV {duckLevel} · XP {duckXpInLevel}/100
-                </p>
+                <p>LV {duckLevel}</p>
+
+                <div className="xp-bar">
+                  <div
+                  className="xp-fill"
+                    style={{
+                      width: `${duckXpInLevel}%`,
+                    }}
+                  />
+                </div>
+
+                <small>
+                  {duckXpInLevel}/100 XP
+                </small>
+              
               </div>
 
             <button onClick={() => setShowDuckGuide(true)}>
