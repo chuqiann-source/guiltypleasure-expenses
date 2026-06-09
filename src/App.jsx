@@ -723,30 +723,29 @@ function App() {
               ))}
             </select>
 
-            <div
-              
-                <CalendarDaysIcon />
+           <label className="date-pill-field">
+            <CalendarDaysIcon />
 
-              <span>
-                {new Date(splitForm.date).toLocaleDateString("en-MY", {
-                    day: "numeric",
-                  month: "short",
-                  year: "numeric",
-              })}
-            </span>
-
-            <input
-              type="date"
-              value={splitForm.date}
-              onChange={(e) =>
-                setSplitForm({
-                  ...splitForm,
-                  date: e.target.value,
-                })
-              }
-              className="hidden-date-input"
-            />
-          </label>
+            <span>
+            {new Date(splitForm.date).toLocaleDateString("en-MY", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
+        
+          <input
+            type="date"
+            value={splitForm.date}
+            onChange={(e) =>
+              setSplitForm({
+                ...splitForm,
+                date: e.target.value,
+              })
+            }
+            className="hidden-date-input"
+          />
+        </label>
 
             <div className="segmented-split">
               {["equal", "custom", "percentage"].map((type) => (
@@ -1097,7 +1096,7 @@ function ExpenseModal({ form, setForm, close, save }) {
               <CalendarDaysIcon />
 
               <span>
-              {new Date(splitForm.date).toLocaleDateString("en-MY", {
+              {new Date(form.date).toLocaleDateString("en-MY", {
               day: "numeric",
               month: "short",
               year: "numeric",
