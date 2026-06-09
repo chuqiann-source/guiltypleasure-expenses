@@ -724,30 +724,29 @@ function App() {
             </select>
 
             <div
-              className="date-pill-field"
-              onClick={() =>
-                document.getElementById("split-date-picker").showPicker?.()
-              }
-            >
-              <CalendarDaysIcon />
+              <label className="date-pill-field">
+                <CalendarDaysIcon />
+
               <span>
                 {new Date(splitForm.date).toLocaleDateString("en-MY", {
-                  day: "numeric",
+                    day: "numeric",
                   month: "short",
                   year: "numeric",
-                })}
-              </span>
-            </div>
+              })}
+            </span>
 
             <input
-              id="split-date-picker"
-              className="hidden-date-input"
               type="date"
               value={splitForm.date}
               onChange={(e) =>
-                setSplitForm({ ...splitForm, date: e.target.value })
+                setSplitForm({
+                  ...splitForm,
+                  date: e.target.value,
+                })
               }
+              className="hidden-date-input"
             />
+          </label>
 
             <div className="segmented-split">
               {["equal", "custom", "percentage"].map((type) => (
