@@ -724,7 +724,7 @@ function App() {
             </select>
 
             <div
-              <label className="date-pill-field">
+              
                 <CalendarDaysIcon />
 
               <span>
@@ -1093,30 +1093,25 @@ function ExpenseModal({ form, setForm, close, save }) {
             ))}
           </select>
 
-          <div
-            className="date-pill-field"
-            onClick={() =>
-              document.getElementById("expense-date-picker").showPicker?.()
-            }
-          >
-            <CalendarDaysIcon />
-            <span>
-              {new Date(form.date).toLocaleDateString("en-MY", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </span>
-          </div>
+            <label className="date-pill-field">
+              <CalendarDaysIcon />
 
-          <input
-            id="expense-date-picker"
-            className="hidden-date-input"
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
+              <span>
+              {new Date(splitForm.date).toLocaleDateString("en-MY", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+             })}
+          </span>
 
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="hidden-date-input"
+              />
+            </label>
+          
           <input
             placeholder="Note"
             value={form.note}
