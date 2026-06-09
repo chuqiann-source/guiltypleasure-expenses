@@ -53,7 +53,7 @@ svg {
   max-width: 430px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 18px 14px 140px;
+  padding: 18px 14px 150px;
 }
 
 .app-shell {
@@ -431,6 +431,10 @@ svg {
   gap: 9px;
 }
 
+.split-list {
+  padding-bottom: 30px;
+}
+
 .category-row,
 .transaction {
   display: flex;
@@ -539,7 +543,7 @@ svg {
 .record-button {
   position: fixed;
   left: 50%;
-  bottom: 62px;
+  bottom: 76px;
   transform: translateX(-50%);
   border: 3px solid var(--line);
   background: var(--accent-light);
