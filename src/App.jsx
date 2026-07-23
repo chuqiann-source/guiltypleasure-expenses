@@ -260,6 +260,7 @@ function App() {
   const [splitForm, setSplitForm] = useState({
     title: "",
     amount: "",
+    taxPercentage: "",
     currency: mainCurrency,
     category: "Friends",
     paidBy: "You",
@@ -577,13 +578,22 @@ function App() {
     0
   );
 
+  const splitSubtotal =
+    splitForm.splitType === "items"
+      ? itemizedTotal
+      : Number(splitForm.amount || 0);
+  const splitTaxPercentage = Math.min(
+    Math.max(Number(splitForm.taxPercentage || 0), 0),
+    100
+  );
+  const splitTaxMultiplier = 1 + splitTaxPercentage / 100;
+  const splitTaxAmount = splitSubtotal * (splitTaxPercentage / 100);
+  const splitGrandTotal = splitSubtotal + splitTaxAmount;
+
   function addSplitBill(e) {
     e.preventDefault();
 
-    const amount =
-      splitForm.splitType === "items"
-        ? itemizedTotal
-        : Number(splitForm.amount);
+    const amount = splitGrandTotal;
     if (!splitForm.title || !amount || !splitForm.paidBy) return;
     if (splitForm.selectedFriends.length === 0) return;
 
@@ -610,7 +620,7 @@ function App() {
         .filter((row) => Number(row.value) > 0)
         .map((row) => ({
           person: row.name,
-          amount: Number(row.value),
+          amount: Number(row.value) * splitTaxMultiplier,
           settled: false,
         }));
     }
@@ -620,7 +630,7 @@ function App() {
         .filter((row) => Number(row.value) > 0)
         .map((row) => ({
           person: row.name,
-          amount: amount * (Number(row.value) / 100),
+          amount: splitGrandTotal * (Number(row.value) / 100),
           settled: false,
         }));
     }
@@ -632,7 +642,7 @@ function App() {
           amount: row.items.reduce(
             (sum, item) => sum + Number(item.amount || 0),
             0
-          ),
+          ) * splitTaxMultiplier,
           settled: false,
         }))
         .filter(
@@ -644,6 +654,9 @@ function App() {
       id: crypto.randomUUID(),
       title: splitForm.title.trim(),
       amount,
+      subtotal: splitSubtotal,
+      taxPercentage: splitTaxPercentage,
+      taxAmount: splitTaxAmount,
       currency: splitForm.currency,
       category: splitForm.category,
       paidBy: splitForm.paidBy.trim(),
@@ -657,6 +670,7 @@ function App() {
     setSplitForm({
       title: "",
       amount: "",
+      taxPercentage: "",
       currency: mainCurrency,
       category: "Friends",
       paidBy: "You",
@@ -945,6 +959,29 @@ function App() {
           />
         </label>
 
+            <label className="tax-field">
+              <span>Tax percentage</span>
+              <div>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={splitForm.taxPercentage}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (
+                      value === "" ||
+                      (/^\d{0,3}(?:\.\d{0,2})?$/.test(value) &&
+                        Number(value) <= 100)
+                    ) {
+                      setSplitForm({ ...splitForm, taxPercentage: value });
+                    }
+                  }}
+                />
+                <b>%</b>
+              </div>
+            </label>
+
             <div className="segmented-split">
               {["equal", "custom", "percentage", "items"].map((type) => (
                 <button
@@ -1061,14 +1098,23 @@ function App() {
                   );
                 })}
 
-                <div className="split-grand-total">
-                  <span>Bill total</span>
-                  <strong>
-                    {formatMoney(itemizedTotal, splitForm.currency)}
-                  </strong>
-                </div>
               </div>
             )}
+
+            <div className="split-total-summary">
+              <span>
+                Subtotal
+                <b>{formatMoney(splitSubtotal, splitForm.currency)}</b>
+              </span>
+              <span>
+                Tax ({splitTaxPercentage.toFixed(2)}%)
+                <b>{formatMoney(splitTaxAmount, splitForm.currency)}</b>
+              </span>
+              <strong>
+                Total
+                <b>{formatMoney(splitGrandTotal, splitForm.currency)}</b>
+              </strong>
+            </div>
 
             <button className="save-btn" type="submit">
               save split
@@ -1085,6 +1131,13 @@ function App() {
                       {bill.date} · {bill.paidBy} paid{" "}
                       {formatMoney(bill.amount, bill.currency)}
                     </p>
+                    {Number(bill.taxAmount || 0) > 0 && (
+                      <p>
+                        Subtotal {formatMoney(bill.subtotal, bill.currency)} · Tax{" "}
+                        {Number(bill.taxPercentage || 0).toFixed(2)}% (
+                        {formatMoney(bill.taxAmount, bill.currency)})
+                      </p>
+                    )}
                   </div>
 
                   <button

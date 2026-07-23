@@ -591,16 +591,14 @@ select:focus {
     inset -2px -2px rgba(0, 0, 0, 0.18);
 }
 
-.person-calculator-head,
-.split-grand-total {
+.person-calculator-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.person-calculator-head b,
-.split-grand-total strong {
+.person-calculator-head b {
   color: #0f4f21;
 }
 
@@ -649,12 +647,60 @@ select:focus {
   text-transform: uppercase;
 }
 
-.split-grand-total {
-  border: 3px solid var(--line);
-  background: var(--accent-light);
-  padding: 12px;
-  font-size: 14px;
+.tax-field {
+  display: grid;
+  grid-template-columns: 1fr 116px;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
   font-weight: 900;
+}
+
+.tax-field > div {
+  position: relative;
+}
+
+.tax-field input {
+  padding-right: 32px;
+  text-align: right;
+}
+
+.tax-field b {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.split-total-summary {
+  border: 3px solid var(--line);
+  background: #d8b878;
+  padding: 12px;
+  display: grid;
+  gap: 7px;
+  font-weight: 900;
+  box-shadow:
+    inset 2px 2px rgba(255, 255, 255, 0.25),
+    inset -2px -2px rgba(0, 0, 0, 0.18);
+}
+
+.split-total-summary span,
+.split-total-summary strong {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.split-total-summary strong {
+  border-top: 2px solid var(--line);
+  padding-top: 8px;
+  color: #102815;
+  font-size: 14px;
+}
+
+.split-total-summary b {
+  color: #0f4f21;
 }
 
 .receipt-capture {
