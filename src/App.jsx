@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
-import { createWorker } from "tesseract.js";
+import { createWorker, PSM } from "tesseract.js";
 
 import {
   CakeIcon,
@@ -116,6 +116,100 @@ function parseReceiptText(text) {
     merchant,
     rawText: text.trim(),
   };
+}
+
+let openCvLoadPromise;
+
+function loadOpenCvScript() {
+  if (window.cv) return Promise.resolve();
+  if (openCvLoadPromise) return openCvLoadPromise;
+
+  openCvLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `${import.meta.env.BASE_URL}vendor/opencv/opencv.js`;
+    script.async = true;
+    script.dataset.opencv = "true";
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("OpenCV script failed to load"));
+    document.head.appendChild(script);
+  });
+
+  return openCvLoadPromise;
+}
+
+async function waitForOpenCv(timeoutMs = 30000) {
+  await loadOpenCvScript();
+  const startedAt = performance.now();
+
+  while (performance.now() - startedAt < timeoutMs) {
+    let cv = window.cv;
+    if (cv instanceof Promise) cv = await cv;
+    if (cv?.Mat) return cv;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error("OpenCV did not finish loading");
+}
+
+async function preprocessReceipt(imageData) {
+  const cv = await waitForOpenCv();
+  const image = new Image();
+  image.src = imageData;
+  await image.decode();
+
+  const inputCanvas = document.createElement("canvas");
+  inputCanvas.width = image.naturalWidth;
+  inputCanvas.height = image.naturalHeight;
+  inputCanvas.getContext("2d").drawImage(image, 0, 0);
+
+  const outputCanvas = document.createElement("canvas");
+  const source = cv.imread(inputCanvas);
+  const grayscale = new cv.Mat();
+  const denoised = new cv.Mat();
+  const binary = new cv.Mat();
+  const bordered = new cv.Mat();
+
+  try {
+    cv.cvtColor(source, grayscale, cv.COLOR_RGBA2GRAY);
+    cv.medianBlur(grayscale, denoised, 3);
+    cv.adaptiveThreshold(
+      denoised,
+      binary,
+      255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY,
+      31,
+      12
+    );
+    cv.copyMakeBorder(
+      binary,
+      bordered,
+      20,
+      20,
+      20,
+      20,
+      cv.BORDER_CONSTANT,
+      new cv.Scalar(255, 255, 255, 255)
+    );
+    cv.imshow(outputCanvas, bordered);
+    return outputCanvas.toDataURL("image/png");
+  } finally {
+    source.delete();
+    grayscale.delete();
+    denoised.delete();
+    binary.delete();
+    bordered.delete();
+  }
+}
+
+function receiptResultScore(result) {
+  const parsed = parseReceiptText(result.data.text);
+  return (
+    Number(result.data.confidence || 0) +
+    (parsed.amount ? 40 : 0) +
+    (parsed.date ? 15 : 0) +
+    (parsed.merchant ? 10 : 0)
+  );
 }
 
 function App() {
@@ -1244,20 +1338,50 @@ function ExpenseModal({ form, setForm, close, save }) {
   async function scanReceipt(imageData) {
     setScanError("");
     setScanProgress(0);
-    setScanStatus("Preparing receipt scanner");
+    setScanStatus("Enhancing receipt image");
 
     let worker;
     try {
+      let enhancedImage = "";
+      try {
+        enhancedImage = await preprocessReceipt(imageData);
+      } catch (error) {
+        console.warn("OpenCV preprocessing unavailable; using original", error);
+      }
+
+      let progressBase = 0;
+      let progressScale = enhancedImage ? 0.5 : 1;
       worker = await createWorker("eng", 1, {
         logger: (message) => {
           if (message.status) setScanStatus(message.status);
           if (typeof message.progress === "number") {
-            setScanProgress(Math.round(message.progress * 100));
+            setScanProgress(
+              Math.round((progressBase + message.progress * progressScale) * 100)
+            );
           }
         },
       });
 
-      const result = await worker.recognize(imageData);
+      await worker.setParameters({
+        tessedit_pageseg_mode: PSM.AUTO,
+        preserve_interword_spaces: "1",
+        user_defined_dpi: "300",
+      });
+
+      const results = [];
+      if (enhancedImage) {
+        setScanStatus("Scanning enhanced receipt");
+        results.push(await worker.recognize(enhancedImage));
+        progressBase = 0.5;
+        progressScale = 0.5;
+      }
+
+      setScanStatus("Checking original receipt");
+      results.push(await worker.recognize(imageData));
+
+      const result = results.sort(
+        (left, right) => receiptResultScore(right) - receiptResultScore(left)
+      )[0];
       const parsed = parseReceiptText(result.data.text);
 
       setForm((current) => ({
@@ -1292,19 +1416,40 @@ function ExpenseModal({ form, setForm, close, save }) {
     reader.onload = () => {
       const image = new Image();
       image.onload = () => {
-        const maxSide = 1200;
-        const scale = Math.min(maxSide / image.width, maxSide / image.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(image.width * scale);
-        canvas.height = Math.round(image.height * scale);
-        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-        const receipt = canvas.toDataURL("image/jpeg", 0.72);
+        const ocrMaxSide = 2400;
+        const ocrScale = Math.min(
+          ocrMaxSide / image.width,
+          ocrMaxSide / image.height,
+          1
+        );
+        const ocrCanvas = document.createElement("canvas");
+        ocrCanvas.width = Math.round(image.width * ocrScale);
+        ocrCanvas.height = Math.round(image.height * ocrScale);
+        ocrCanvas
+          .getContext("2d")
+          .drawImage(image, 0, 0, ocrCanvas.width, ocrCanvas.height);
+        const ocrReceipt = ocrCanvas.toDataURL("image/jpeg", 0.9);
+
+        const storedMaxSide = 1200;
+        const storedScale = Math.min(
+          storedMaxSide / image.width,
+          storedMaxSide / image.height,
+          1
+        );
+        const storedCanvas = document.createElement("canvas");
+        storedCanvas.width = Math.round(image.width * storedScale);
+        storedCanvas.height = Math.round(image.height * storedScale);
+        storedCanvas
+          .getContext("2d")
+          .drawImage(image, 0, 0, storedCanvas.width, storedCanvas.height);
+        const receipt = storedCanvas.toDataURL("image/jpeg", 0.75);
+
         setForm((current) => ({
           ...current,
           receipt,
           receiptText: "",
         }));
-        scanReceipt(receipt);
+        scanReceipt(ocrReceipt);
       };
       image.src = reader.result;
     };
