@@ -118,88 +118,83 @@ function parseReceiptText(text) {
   };
 }
 
-let openCvLoadPromise;
-
-function loadOpenCvScript() {
-  if (window.cv) return Promise.resolve();
-  if (openCvLoadPromise) return openCvLoadPromise;
-
-  openCvLoadPromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `${import.meta.env.BASE_URL}vendor/opencv/opencv.js`;
-    script.async = true;
-    script.dataset.opencv = "true";
-    script.onload = resolve;
-    script.onerror = () => reject(new Error("OpenCV script failed to load"));
-    document.head.appendChild(script);
-  });
-
-  return openCvLoadPromise;
-}
-
-async function waitForOpenCv(timeoutMs = 30000) {
-  await loadOpenCvScript();
-  const startedAt = performance.now();
-
-  while (performance.now() - startedAt < timeoutMs) {
-    let cv = window.cv;
-    if (cv instanceof Promise) cv = await cv;
-    if (cv?.Mat) return cv;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  throw new Error("OpenCV did not finish loading");
-}
-
 async function preprocessReceipt(imageData) {
-  const cv = await waitForOpenCv();
   const image = new Image();
   image.src = imageData;
   await image.decode();
 
+  const maxSide = 1600;
+  const scale = Math.min(
+    maxSide / image.naturalWidth,
+    maxSide / image.naturalHeight,
+    1
+  );
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
   const inputCanvas = document.createElement("canvas");
-  inputCanvas.width = image.naturalWidth;
-  inputCanvas.height = image.naturalHeight;
-  inputCanvas.getContext("2d").drawImage(image, 0, 0);
+  inputCanvas.width = width;
+  inputCanvas.height = height;
+  const inputContext = inputCanvas.getContext("2d", {
+    willReadFrequently: true,
+  });
+  inputContext.drawImage(image, 0, 0, width, height);
 
-  const outputCanvas = document.createElement("canvas");
-  const source = cv.imread(inputCanvas);
-  const grayscale = new cv.Mat();
-  const denoised = new cv.Mat();
-  const binary = new cv.Mat();
-  const bordered = new cv.Mat();
+  const source = inputContext.getImageData(0, 0, width, height);
+  const grayscale = new Uint8Array(width * height);
+  const integralWidth = width + 1;
+  const integral = new Uint32Array(integralWidth * (height + 1));
 
-  try {
-    cv.cvtColor(source, grayscale, cv.COLOR_RGBA2GRAY);
-    cv.medianBlur(grayscale, denoised, 3);
-    cv.adaptiveThreshold(
-      denoised,
-      binary,
-      255,
-      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-      cv.THRESH_BINARY,
-      31,
-      12
-    );
-    cv.copyMakeBorder(
-      binary,
-      bordered,
-      20,
-      20,
-      20,
-      20,
-      cv.BORDER_CONSTANT,
-      new cv.Scalar(255, 255, 255, 255)
-    );
-    cv.imshow(outputCanvas, bordered);
-    return outputCanvas.toDataURL("image/png");
-  } finally {
-    source.delete();
-    grayscale.delete();
-    denoised.delete();
-    binary.delete();
-    bordered.delete();
+  for (let y = 0; y < height; y += 1) {
+    let rowTotal = 0;
+    for (let x = 0; x < width; x += 1) {
+      const pixel = y * width + x;
+      const offset = pixel * 4;
+      const gray = Math.round(
+        source.data[offset] * 0.299 +
+          source.data[offset + 1] * 0.587 +
+          source.data[offset + 2] * 0.114
+      );
+      grayscale[pixel] = gray;
+      rowTotal += gray;
+      integral[(y + 1) * integralWidth + x + 1] =
+        integral[y * integralWidth + x + 1] + rowTotal;
+    }
   }
+
+  const border = 20;
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = width + border * 2;
+  outputCanvas.height = height + border * 2;
+  const outputContext = outputCanvas.getContext("2d");
+  outputContext.fillStyle = "#fff";
+  outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+  const output = outputContext.createImageData(width, height);
+  const radius = 18;
+
+  for (let y = 0; y < height; y += 1) {
+    const top = Math.max(0, y - radius);
+    const bottom = Math.min(height - 1, y + radius);
+    for (let x = 0; x < width; x += 1) {
+      const left = Math.max(0, x - radius);
+      const right = Math.min(width - 1, x + radius);
+      const area = (right - left + 1) * (bottom - top + 1);
+      const sum =
+        integral[(bottom + 1) * integralWidth + right + 1] -
+        integral[top * integralWidth + right + 1] -
+        integral[(bottom + 1) * integralWidth + left] +
+        integral[top * integralWidth + left];
+      const value =
+        grayscale[y * width + x] < sum / area - 10 ? 0 : 255;
+      const offset = (y * width + x) * 4;
+      output.data[offset] = value;
+      output.data[offset + 1] = value;
+      output.data[offset + 2] = value;
+      output.data[offset + 3] = 255;
+    }
+  }
+
+  outputContext.putImageData(output, border, border);
+  return outputCanvas.toDataURL("image/png");
 }
 
 function receiptResultScore(result) {
@@ -1346,7 +1341,7 @@ function ExpenseModal({ form, setForm, close, save }) {
       try {
         enhancedImage = await preprocessReceipt(imageData);
       } catch (error) {
-        console.warn("OpenCV preprocessing unavailable; using original", error);
+        console.warn("Receipt preprocessing unavailable; using original", error);
       }
 
       let progressBase = 0;
