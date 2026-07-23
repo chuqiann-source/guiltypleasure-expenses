@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
-import DuckLevel1 from "./DuckLevel1";
+import { createWorker } from "tesseract.js";
 
 import {
   CakeIcon,
@@ -17,6 +17,8 @@ import {
   ClockIcon,
   CheckCircleIcon,
   CalendarDaysIcon,
+  CameraIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 
 const categories = [
@@ -42,20 +44,78 @@ function formatCentsInput(value) {
   return digits ? (Number(digits) / 100).toFixed(2) : "";
 }
 
-function getDuckStage(level) {
-  if (level >= 30) return "Duck King";
-  if (level >= 20) return "Merchant Duck";
-  if (level >= 10) return "Miner Duck";
-  if (level >= 5) return "Explorer Duck";
-  return "Baby Duck";
+function parseReceiptDate(text) {
+  const match = text.match(
+    /\b(?:(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})|(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4}))\b/
+  );
+  if (!match) return "";
+
+  let year = match[1] || match[6];
+  const month = match[2] || match[5];
+  const day = match[3] || match[4];
+  if (year.length === 2) year = `20${year}`;
+
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  if (
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() !== Number(month) - 1 ||
+    date.getDate() !== Number(day)
+  ) {
+    return "";
+  }
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+    2,
+    "0"
+  )}`;
 }
 
-function getDuckAssets(level) {
-  if (level >= 30) return { duck: "duck-30.png", room: "room-30.png" };
-  if (level >= 20) return { duck: "duck-20.png", room: "room-20.png" };
-  if (level >= 10) return { duck: "duck-10.png", room: "room-10.png" };
-  if (level >= 5) return { duck: "duck-05.png", room: "room-05.png" };
-  return { duck: "duck-01.png", room: "room-01.png" };
+function parseReceiptText(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const amountAtEnd =
+    /(?:RM|MYR|SGD|\$)?\s*(\d{1,3}(?:,\d{3})*\.\d{2}|\d{1,6}[,.]\d{2})\s*$/i;
+  const totalWords = /\b(grand\s*total|amount\s*due|balance\s*due|net\s*total|total)\b/i;
+  const excludedTotalWords =
+    /\b(sub\s*total|subtotal|tax|gst|sst|change|cash|rounding|saving|discount)\b/i;
+  const toAmount = (value) =>
+    Number(
+      value.includes(".") ? value.replaceAll(",", "") : value.replace(",", ".")
+    );
+
+  const preferredTotals = lines
+    .filter(
+      (line) => totalWords.test(line) && !excludedTotalWords.test(line)
+    )
+    .map((line) => line.match(amountAtEnd))
+    .filter(Boolean)
+    .map((match) => toAmount(match[1]));
+
+  const allAmounts = lines
+    .map((line) => line.match(amountAtEnd))
+    .filter(Boolean)
+    .map((match) => toAmount(match[1]))
+    .filter((amount) => Number.isFinite(amount) && amount > 0);
+
+  const merchant =
+    lines.find(
+      (line) =>
+        line.length >= 3 &&
+        line.length <= 60 &&
+        /[a-z]/i.test(line) &&
+        !/\b(receipt|invoice|tax|date|time|cashier|table|order)\b/i.test(line) &&
+        !/\d{4,}/.test(line)
+    ) || "";
+
+  return {
+    amount: preferredTotals.at(-1) || (allAmounts.length ? Math.max(...allAmounts) : 0),
+    date: parseReceiptDate(text),
+    merchant,
+    rawText: text.trim(),
+  };
 }
 
 function App() {
@@ -85,20 +145,11 @@ function App() {
     () => JSON.parse(localStorage.getItem("guilty_split_bills")) || []
   );
 
-  const [duck, setDuck] = useState(
-    () =>
-      JSON.parse(localStorage.getItem("guilty_duck")) || {
-        xp: 0,
-        level: 1,
-      }
-  );
-
   const [tab, setTab] = useState("home");
   const [historyMode, setHistoryMode] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [showDuckGuide, setShowDuckGuide] = useState(false);
   const [showSettlement, setShowSettlement] = useState(false);
   const [newFriend, setNewFriend] = useState("");
 
@@ -108,6 +159,8 @@ function App() {
     category: "Food",
     date: todayDate,
     note: "",
+    receipt: "",
+    receiptText: "",
   });
 
   const [splitForm, setSplitForm] = useState({
@@ -120,6 +173,7 @@ function App() {
     splitType: "equal",
     selectedFriends: [],
     customRows: [],
+    itemRows: [],
   });
 
   useEffect(() => {
@@ -137,22 +191,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem("guilty_split_bills", JSON.stringify(splitBills));
   }, [splitBills]);
-
-  useEffect(() => {
-    localStorage.setItem("guilty_duck", JSON.stringify(duck));
-  }, [duck]);
-
-  const duckLevel = duck.level;
-  const duckStage = getDuckStage(duckLevel);
-  const duckXpInLevel = duck.xp % 100;
-  const duckAssets = getDuckAssets(duckLevel);
-  const basePath = `${import.meta.env.BASE_URL}ducks/`;
-
-  function rewardDuck(points) {
-    const newXp = duck.xp + points;
-    const newLevel = Math.floor(newXp / 100) + 1;
-    setDuck({ xp: newXp, level: newLevel });
-  }
 
   function getMyShareFromSplitBill(bill) {
     const amount = Number(bill.amount || 0);
@@ -182,60 +220,52 @@ function App() {
       }, 0);
   }
 
-  const currentMonthPersonalExpenses = useMemo(() => {
-    return expenses.filter(
-      (item) =>
-        item.date.startsWith(currentMonth) && item.currency === mainCurrency
-    );
-  }, [expenses, currentMonth, mainCurrency]);
+  const currentMonthPersonalExpenses = expenses.filter(
+    (item) =>
+      item.date.startsWith(currentMonth) && item.currency === mainCurrency
+  );
 
-  const currentMonthSplitExpenses = useMemo(() => {
-    return splitBills
-      .filter(
-        (bill) =>
-          bill.date.startsWith(currentMonth) && bill.currency === mainCurrency
-      )
-      .map((bill) => ({
-        id: `split-${bill.id}`,
-        amount: getMyShareFromSplitBill(bill),
-        currency: bill.currency,
-        category: bill.category || "Friends",
-        date: bill.date,
-        note: `Split: ${bill.title}`,
-        isSplit: true,
-      }))
-      .filter((item) => item.amount > 0);
-  }, [splitBills, currentMonth, mainCurrency]);
+  const currentMonthSplitExpenses = splitBills
+    .filter(
+      (bill) =>
+        bill.date.startsWith(currentMonth) && bill.currency === mainCurrency
+    )
+    .map((bill) => ({
+      id: `split-${bill.id}`,
+      amount: getMyShareFromSplitBill(bill),
+      currency: bill.currency,
+      category: bill.category || "Friends",
+      date: bill.date,
+      note: `Split: ${bill.title}`,
+      isSplit: true,
+    }))
+    .filter((item) => item.amount > 0);
 
   const currentMonthExpenses = [
     ...currentMonthPersonalExpenses,
     ...currentMonthSplitExpenses,
   ];
 
-  const historyPersonalExpenses = useMemo(() => {
-    return expenses.filter(
-      (item) =>
-        item.date.startsWith(selectedMonth) && item.currency === mainCurrency
-    );
-  }, [expenses, selectedMonth, mainCurrency]);
+  const historyPersonalExpenses = expenses.filter(
+    (item) =>
+      item.date.startsWith(selectedMonth) && item.currency === mainCurrency
+  );
 
-  const historySplitExpenses = useMemo(() => {
-    return splitBills
-      .filter(
-        (bill) =>
-          bill.date.startsWith(selectedMonth) && bill.currency === mainCurrency
-      )
-      .map((bill) => ({
-        id: `split-${bill.id}`,
-        amount: getMyShareFromSplitBill(bill),
-        currency: bill.currency,
-        category: bill.category || "Friends",
-        date: bill.date,
-        note: `Split: ${bill.title}`,
-        isSplit: true,
-      }))
-      .filter((item) => item.amount > 0);
-  }, [splitBills, selectedMonth, mainCurrency]);
+  const historySplitExpenses = splitBills
+    .filter(
+      (bill) =>
+        bill.date.startsWith(selectedMonth) && bill.currency === mainCurrency
+    )
+    .map((bill) => ({
+      id: `split-${bill.id}`,
+      amount: getMyShareFromSplitBill(bill),
+      currency: bill.currency,
+      category: bill.category || "Friends",
+      date: bill.date,
+      note: `Split: ${bill.title}`,
+      isSplit: true,
+    }))
+    .filter((item) => item.amount > 0);
 
   const historyMonthExpenses = [...historyPersonalExpenses, ...historySplitExpenses];
 
@@ -284,23 +314,25 @@ function App() {
     if (!expenseForm.amount || Number(expenseForm.amount) <= 0) return;
 
     const newExpense = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       amount: Number(expenseForm.amount),
       currency: expenseForm.currency,
       category: expenseForm.category,
       date: expenseForm.date,
       note: expenseForm.note.trim(),
+      receipt: expenseForm.receipt,
+      receiptText: expenseForm.receiptText,
     };
 
     setExpenses([newExpense, ...expenses]);
-    rewardDuck(expenseForm.category === "Travel" ? 8 : 5);
-
     setExpenseForm({
       amount: "",
       currency: mainCurrency,
       category: "Food",
       date: todayDate,
       note: "",
+      receipt: "",
+      receiptText: "",
     });
 
     setShowExpenseModal(false);
@@ -330,6 +362,7 @@ function App() {
         (friend) => friend !== name
       ),
       customRows: splitForm.customRows.filter((row) => row.name !== name),
+      itemRows: splitForm.itemRows.filter((row) => row.name !== name),
     });
   }
 
@@ -344,7 +377,14 @@ function App() {
       ? splitForm.customRows.filter((row) => row.name !== name)
       : [...splitForm.customRows, { name, value: "" }];
 
-    setSplitForm({ ...splitForm, selectedFriends, customRows });
+    const itemRows = selected
+      ? splitForm.itemRows.filter((row) => row.name !== name)
+      : [
+          ...splitForm.itemRows,
+          { name, items: [{ id: crypto.randomUUID(), label: "", amount: "" }] },
+        ];
+
+    setSplitForm({ ...splitForm, selectedFriends, customRows, itemRows });
   }
 
   function updateCustomValue(name, value) {
@@ -361,10 +401,95 @@ function App() {
     });
   }
 
+  function selectSplitType(splitType) {
+    const hasYou = splitForm.itemRows.some((row) => row.name === "You");
+    setSplitForm({
+      ...splitForm,
+      splitType,
+      itemRows:
+        splitType === "items" && !hasYou
+          ? [
+              {
+                name: "You",
+                items: [
+                  { id: crypto.randomUUID(), label: "", amount: "" },
+                ],
+              },
+              ...splitForm.itemRows,
+            ]
+          : splitForm.itemRows,
+    });
+  }
+
+  function addPersonItem(name) {
+    setSplitForm({
+      ...splitForm,
+      itemRows: splitForm.itemRows.map((row) =>
+        row.name === name
+          ? {
+              ...row,
+              items: [
+                ...row.items,
+                { id: crypto.randomUUID(), label: "", amount: "" },
+              ],
+            }
+          : row
+      ),
+    });
+  }
+
+  function updatePersonItem(name, itemId, field, value) {
+    setSplitForm({
+      ...splitForm,
+      itemRows: splitForm.itemRows.map((row) =>
+        row.name === name
+          ? {
+              ...row,
+              items: row.items.map((item) =>
+                item.id === itemId
+                  ? {
+                      ...item,
+                      [field]:
+                        field === "amount" ? formatCentsInput(value) : value,
+                    }
+                  : item
+              ),
+            }
+          : row
+      ),
+    });
+  }
+
+  function removePersonItem(name, itemId) {
+    setSplitForm({
+      ...splitForm,
+      itemRows: splitForm.itemRows.map((row) =>
+        row.name === name
+          ? {
+              ...row,
+              items: row.items.filter((item) => item.id !== itemId),
+            }
+          : row
+      ),
+    });
+  }
+
+  const itemizedRows = splitForm.itemRows;
+
+  const itemizedTotal = itemizedRows.reduce(
+    (total, row) =>
+      total +
+      row.items.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    0
+  );
+
   function addSplitBill(e) {
     e.preventDefault();
 
-    const amount = Number(splitForm.amount);
+    const amount =
+      splitForm.splitType === "items"
+        ? itemizedTotal
+        : Number(splitForm.amount);
     if (!splitForm.title || !amount || !splitForm.paidBy) return;
     if (splitForm.selectedFriends.length === 0) return;
 
@@ -406,8 +531,23 @@ function App() {
         }));
     }
 
+    if (splitForm.splitType === "items") {
+      owes = itemizedRows
+        .map((row) => ({
+          person: row.name,
+          amount: row.items.reduce(
+            (sum, item) => sum + Number(item.amount || 0),
+            0
+          ),
+          settled: false,
+        }))
+        .filter(
+          (row) => row.person !== splitForm.paidBy && row.amount > 0
+        );
+    }
+
     const newBill = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       title: splitForm.title.trim(),
       amount,
       currency: splitForm.currency,
@@ -416,11 +556,10 @@ function App() {
       date: splitForm.date,
       splitType: splitForm.splitType,
       owes,
+      itemRows: splitForm.splitType === "items" ? itemizedRows : undefined,
     };
 
     setSplitBills([newBill, ...splitBills]);
-    rewardDuck(5);
-
     setSplitForm({
       title: "",
       amount: "",
@@ -431,6 +570,7 @@ function App() {
       splitType: "equal",
       selectedFriends: [],
       customRows: [],
+      itemRows: [],
     });
   }
 
@@ -447,7 +587,6 @@ function App() {
           ...bill,
           owes: bill.owes.map((item) => {
             if (item.person !== person) return item;
-            if (!item.settled) rewardDuck(10);
             return { ...item, settled: !item.settled };
           }),
         };
@@ -539,43 +678,6 @@ function App() {
               </button>
             ))}
           </div>
-
-          <section className="duck-card">
-            <div className="duck-face animated-duck">
-              {duckLevel < 5 ? (
-                <DuckLevel1 />
-              ) : (
-               <img
-                  src={`${basePath}${duckAssets.duck}`}
-                  alt={duckStage}
-                />
-              )}
-            </div>
-
-            <div>
-              <strong>{duckStage}</strong>
-
-                <p>LV {duckLevel}</p>
-
-                <div className="xp-bar">
-                  <div
-                  className="xp-fill"
-                    style={{
-                      width: `${duckXpInLevel}%`,
-                    }}
-                  />
-                </div>
-
-                <small>
-                  {duckXpInLevel}/100 XP
-                </small>
-              
-              </div>
-
-            <button onClick={() => setShowDuckGuide(true)}>
-              evolve
-            </button>
-          </section>
 
           <section className="hero-card">
             <p className="overline">This Month</p>
@@ -671,19 +773,21 @@ function App() {
               }
             />
 
-            <input
-              type="text"
-              inputMode="numeric"
-              enterKeyHint="done"
-              placeholder="0.00"
-              value={splitForm.amount}
-              onChange={(e) =>
-                setSplitForm({
-                  ...splitForm,
-                  amount: formatCentsInput(e.target.value),
-                })
-              }
-            />
+            {splitForm.splitType !== "items" && (
+              <input
+                type="text"
+                inputMode="numeric"
+                enterKeyHint="done"
+                placeholder="0.00"
+                value={splitForm.amount}
+                onChange={(e) =>
+                  setSplitForm({
+                    ...splitForm,
+                    amount: formatCentsInput(e.target.value),
+                  })
+                }
+              />
+            )}
 
             <select
               value={splitForm.currency}
@@ -748,12 +852,12 @@ function App() {
         </label>
 
             <div className="segmented-split">
-              {["equal", "custom", "percentage"].map((type) => (
+              {["equal", "custom", "percentage", "items"].map((type) => (
                 <button
                   key={type}
                   type="button"
                   className={splitForm.splitType === type ? "active" : ""}
-                  onClick={() => setSplitForm({ ...splitForm, splitType: type })}
+                  onClick={() => selectSplitType(type)}
                 >
                   {type === "percentage" ? "%" : type}
                 </button>
@@ -788,6 +892,90 @@ function App() {
               </div>
             )}
 
+            {splitForm.splitType === "items" && (
+              <div className="itemized-split">
+                <p className="hint">
+                  Add every charge to the person who ordered it.
+                </p>
+
+                {itemizedRows.map((row) => {
+                  const personTotal = row.items.reduce(
+                    (sum, item) => sum + Number(item.amount || 0),
+                    0
+                  );
+
+                  return (
+                    <section className="person-calculator" key={row.name}>
+                      <div className="person-calculator-head">
+                        <strong>{row.name}</strong>
+                        <b>
+                          {formatMoney(personTotal, splitForm.currency)}
+                        </b>
+                      </div>
+
+                      {row.items.map((item) => (
+                        <div className="person-item-row" key={item.id}>
+                          <input
+                            aria-label={`${row.name} item`}
+                            placeholder="Item"
+                            value={item.label}
+                            onChange={(e) =>
+                              updatePersonItem(
+                                row.name,
+                                item.id,
+                                "label",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <input
+                            aria-label={`${row.name} item amount`}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0.00"
+                            value={item.amount}
+                            onChange={(e) =>
+                              updatePersonItem(
+                                row.name,
+                                item.id,
+                                "amount",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <button
+                            className="mini-delete-btn"
+                            type="button"
+                            aria-label={`Remove ${row.name} item`}
+                            onClick={() =>
+                              removePersonItem(row.name, item.id)
+                            }
+                          >
+                            <XMarkIcon />
+                          </button>
+                        </div>
+                      ))}
+
+                      <button
+                        className="add-item-btn"
+                        type="button"
+                        onClick={() => addPersonItem(row.name)}
+                      >
+                        <PlusIcon /> add item
+                      </button>
+                    </section>
+                  );
+                })}
+
+                <div className="split-grand-total">
+                  <span>Bill total</span>
+                  <strong>
+                    {formatMoney(itemizedTotal, splitForm.currency)}
+                  </strong>
+                </div>
+              </div>
+            )}
+
             <button className="save-btn" type="submit">
               save split
             </button>
@@ -812,6 +1000,25 @@ function App() {
                     <TrashIcon />
                   </button>
                 </div>
+
+                {bill.itemRows?.map((row) => {
+                  const items = row.items.filter(
+                    (item) => Number(item.amount || 0) > 0
+                  );
+                  if (items.length === 0) return null;
+
+                  return (
+                    <div className="saved-item-breakdown" key={row.name}>
+                      <strong>{row.name}</strong>
+                      {items.map((item) => (
+                        <span key={item.id}>
+                          {item.label || "Item"}{" "}
+                          <b>{formatMoney(item.amount, bill.currency)}</b>
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })}
 
                 {bill.owes.map((item) => (
                   <div
@@ -960,13 +1167,6 @@ function App() {
         />
       )}
 
-      {showDuckGuide && (
-        <DuckGuide
-          close={() => setShowDuckGuide(false)}
-          duckAssets={duckAssets}
-          basePath={basePath}
-        />
-      )}
     </main>
   );
 }
@@ -1037,6 +1237,80 @@ function TransactionList({ items, onDelete }) {
 }
 
 function ExpenseModal({ form, setForm, close, save }) {
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanStatus, setScanStatus] = useState("");
+  const [scanError, setScanError] = useState("");
+
+  async function scanReceipt(imageData) {
+    setScanError("");
+    setScanProgress(0);
+    setScanStatus("Preparing receipt scanner");
+
+    let worker;
+    try {
+      worker = await createWorker("eng", 1, {
+        logger: (message) => {
+          if (message.status) setScanStatus(message.status);
+          if (typeof message.progress === "number") {
+            setScanProgress(Math.round(message.progress * 100));
+          }
+        },
+      });
+
+      const result = await worker.recognize(imageData);
+      const parsed = parseReceiptText(result.data.text);
+
+      setForm((current) => ({
+        ...current,
+        amount: parsed.amount ? parsed.amount.toFixed(2) : current.amount,
+        date: parsed.date || current.date,
+        note: parsed.merchant || current.note,
+        receiptText: parsed.rawText,
+      }));
+      setScanProgress(100);
+      setScanStatus(
+        parsed.amount
+          ? "Receipt scanned — please check the details"
+          : "Scan complete — enter the total manually"
+      );
+    } catch (error) {
+      console.error("Receipt scan failed", error);
+      setScanError(
+        "The receipt could not be read. You can still enter the details manually."
+      );
+      setScanStatus("");
+    } finally {
+      if (worker) await worker.terminate();
+    }
+  }
+
+  function attachReceipt(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const maxSide = 1200;
+        const scale = Math.min(maxSide / image.width, maxSide / image.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        const receipt = canvas.toDataURL("image/jpeg", 0.72);
+        setForm((current) => ({
+          ...current,
+          receipt,
+          receiptText: "",
+        }));
+        scanReceipt(receipt);
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   return (
     <div className="modal-backdrop">
       <section className="modal">
@@ -1117,40 +1391,60 @@ function ExpenseModal({ form, setForm, close, save }) {
             onChange={(e) => setForm({ ...form, note: e.target.value })}
           />
 
-          <button className="save-btn" type="submit">
-            save expense
+          <label className="receipt-capture">
+            <CameraIcon />
+            <span>{form.receipt ? "Retake receipt" : "Take receipt photo"}</span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={attachReceipt}
+            />
+          </label>
+
+          {form.receipt && (
+            <div className="receipt-preview">
+              <img src={form.receipt} alt="Receipt preview" />
+              <button
+                className="delete-btn"
+                type="button"
+                aria-label="Remove receipt"
+                onClick={() => {
+                  setForm({ ...form, receipt: "", receiptText: "" });
+                  setScanStatus("");
+                  setScanError("");
+                  setScanProgress(0);
+                }}
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          )}
+
+          {(scanStatus || scanError) && (
+            <div
+              className={scanError ? "receipt-scan-status error" : "receipt-scan-status"}
+              role="status"
+            >
+              <span>{scanError || scanStatus}</span>
+              {!scanError && scanProgress < 100 && (
+                <div className="scan-progress" aria-label={`${scanProgress}%`}>
+                  <i style={{ width: `${scanProgress}%` }} />
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            className="save-btn"
+            type="submit"
+            disabled={Boolean(scanStatus && scanProgress < 100 && !scanError)}
+          >
+            {scanStatus && scanProgress < 100 && !scanError
+              ? "scanning receipt..."
+              : "save expense"}
           </button>
         </form>
-      </section>
-    </div>
-  );
-}
-
-function DuckGuide({ close, duckAssets, basePath }) {
-  return (
-    <div className="modal-backdrop">
-      <section className="modal">
-        <div className="duck-room">
-          <img src={`${basePath}${duckAssets.room}`} alt="Duck room" />
-        </div>
-
-        <div className="modal-head">
-          <h2>Duck Evolution</h2>
-          <button className="delete-btn" onClick={close}>
-            <XMarkIcon />
-          </button>
-        </div>
-
-        <div className="duck-guide">
-          <p><b>Baby Duck</b> · Start tracking expenses.</p>
-          <p><b>Explorer Duck</b> · Reach LV 5.</p>
-          <p><b>Miner Duck</b> · Reach LV 10 and settle debts.</p>
-          <p><b>Merchant Duck</b> · Reach LV 20 through consistent tracking.</p>
-          <p><b>Duck King</b> · Reach LV 30. Emerald empire achieved.</p>
-          <p className="hint">
-            Expense +5 XP · Split bill +5 XP · Travel +8 XP · Settled debt +10 XP
-          </p>
-        </div>
       </section>
     </div>
   );
