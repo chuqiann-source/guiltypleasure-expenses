@@ -34,6 +34,7 @@ const categories = [
 ];
 
 const currencies = ["RM", "SGD", "JPY"];
+const receiptRulesKey = "guilty_receipt_rules";
 
 function formatMoney(amount, currency = "RM") {
   const decimals = currency === "JPY" ? 0 : 2;
@@ -43,6 +44,55 @@ function formatMoney(amount, currency = "RM") {
 function formatCentsInput(value) {
   const digits = String(value || "").replace(/\D/g, "");
   return digits ? (Number(digits) / 100).toFixed(2) : "";
+}
+
+function normalizeMerchant(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function loadReceiptRules() {
+  try {
+    return JSON.parse(localStorage.getItem(receiptRulesKey)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function findReceiptRule(merchant) {
+  const key = normalizeMerchant(merchant);
+  if (!key) return null;
+
+  return (
+    loadReceiptRules().find(
+      (rule) =>
+        rule.key === key ||
+        (key.length >= 5 &&
+          (rule.key.includes(key) || key.includes(rule.key)))
+    ) || null
+  );
+}
+
+function rememberReceiptRule(detectedMerchant, form) {
+  const key = normalizeMerchant(detectedMerchant || form.note);
+  if (!key) return;
+
+  const rules = loadReceiptRules();
+  const existingIndex = rules.findIndex((rule) => rule.key === key);
+  const existing = existingIndex >= 0 ? rules[existingIndex] : null;
+  const rule = {
+    key,
+    merchant: form.note.trim() || detectedMerchant,
+    category: form.category,
+    currency: form.currency,
+    uses: (existing?.uses || 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (existingIndex >= 0) rules.splice(existingIndex, 1);
+  rules.unshift(rule);
+  localStorage.setItem(receiptRulesKey, JSON.stringify(rules.slice(0, 100)));
 }
 
 function parseReceiptDate(text) {
@@ -199,16 +249,6 @@ async function preprocessReceipt(imageData) {
 
   outputContext.putImageData(output, border, border);
   return outputCanvas.toDataURL("image/png");
-}
-
-function receiptResultScore(result) {
-  const parsed = parseReceiptText(result.data.text);
-  return (
-    Number(result.data.confidence || 0) +
-    (parsed.amount ? 40 : 0) +
-    (parsed.date ? 15 : 0) +
-    (parsed.merchant ? 10 : 0)
-  );
 }
 
 function App() {
@@ -1355,30 +1395,31 @@ function ExpenseModal({ form, setForm, close, save }) {
   const [scanProgress, setScanProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState("");
   const [scanError, setScanError] = useState("");
+  const [scanSource, setScanSource] = useState("");
+  const [detectedMerchant, setDetectedMerchant] = useState("");
+  const [usedLearnedRule, setUsedLearnedRule] = useState(false);
 
-  async function scanReceipt(imageData) {
+  async function scanReceipt(imageData, enhance = false) {
     setScanError("");
     setScanProgress(0);
-    setScanStatus("Enhancing receipt image");
+    setScanStatus(enhance ? "Enhancing receipt image" : "Scanning receipt");
 
     let worker;
     try {
-      let enhancedImage = "";
-      try {
-        enhancedImage = await preprocessReceipt(imageData);
-      } catch (error) {
-        console.warn("Receipt preprocessing unavailable; using original", error);
+      let scanImage = imageData;
+      if (enhance) {
+        try {
+          scanImage = await preprocessReceipt(imageData);
+        } catch (error) {
+          console.warn("Receipt preprocessing unavailable; using original", error);
+        }
       }
 
-      let progressBase = 0;
-      let progressScale = enhancedImage ? 0.5 : 1;
       worker = await createWorker("eng", 1, {
         logger: (message) => {
           if (message.status) setScanStatus(message.status);
           if (typeof message.progress === "number") {
-            setScanProgress(
-              Math.round((progressBase + message.progress * progressScale) * 100)
-            );
+            setScanProgress(Math.round(message.progress * 100));
           }
         },
       });
@@ -1389,34 +1430,29 @@ function ExpenseModal({ form, setForm, close, save }) {
         user_defined_dpi: "300",
       });
 
-      const results = [];
-      if (enhancedImage) {
-        setScanStatus("Scanning enhanced receipt");
-        results.push(await worker.recognize(enhancedImage));
-        progressBase = 0.5;
-        progressScale = 0.5;
-      }
-
-      setScanStatus("Checking original receipt");
-      results.push(await worker.recognize(imageData));
-
-      const result = results.sort(
-        (left, right) => receiptResultScore(right) - receiptResultScore(left)
-      )[0];
+      setScanStatus(enhance ? "Scanning enhanced receipt" : "Reading receipt");
+      const result = await worker.recognize(scanImage);
       const parsed = parseReceiptText(result.data.text);
+      const learnedRule = findReceiptRule(parsed.merchant);
+      setDetectedMerchant(parsed.merchant);
+      setUsedLearnedRule(Boolean(learnedRule));
 
       setForm((current) => ({
         ...current,
         amount: parsed.amount ? parsed.amount.toFixed(2) : current.amount,
         date: parsed.date || current.date,
-        note: parsed.merchant || current.note,
+        note: learnedRule?.merchant || parsed.merchant || current.note,
+        category: learnedRule?.category || current.category,
+        currency: learnedRule?.currency || current.currency,
         receiptText: parsed.rawText,
       }));
       setScanProgress(100);
       setScanStatus(
-        parsed.amount
-          ? "Receipt scanned — please check the details"
-          : "Scan complete — enter the total manually"
+        learnedRule
+          ? "Learned merchant details applied — please check them"
+          : parsed.amount
+            ? "Receipt scanned — please check the details"
+            : "Scan complete — enter the total manually"
       );
     } catch (error) {
       console.error("Receipt scan failed", error);
@@ -1427,6 +1463,13 @@ function ExpenseModal({ form, setForm, close, save }) {
     } finally {
       if (worker) await worker.terminate();
     }
+  }
+
+  function saveAndLearn(event) {
+    if (form.receiptText && Number(form.amount) > 0) {
+      rememberReceiptRule(detectedMerchant, form);
+    }
+    save(event);
   }
 
   function attachReceipt(event) {
@@ -1470,6 +1513,9 @@ function ExpenseModal({ form, setForm, close, save }) {
           receipt,
           receiptText: "",
         }));
+        setScanSource(ocrReceipt);
+        setDetectedMerchant("");
+        setUsedLearnedRule(false);
         scanReceipt(ocrReceipt);
       };
       image.src = reader.result;
@@ -1487,7 +1533,7 @@ function ExpenseModal({ form, setForm, close, save }) {
           </button>
         </div>
 
-        <form className="modal-form" onSubmit={save}>
+        <form className="modal-form" onSubmit={saveAndLearn}>
           <div className="category-grid">
             {categories.map((category) => {
               const Icon = category.icon;
@@ -1580,6 +1626,9 @@ function ExpenseModal({ form, setForm, close, save }) {
                   setScanStatus("");
                   setScanError("");
                   setScanProgress(0);
+                  setScanSource("");
+                  setDetectedMerchant("");
+                  setUsedLearnedRule(false);
                 }}
               >
                 <TrashIcon />
@@ -1598,7 +1647,24 @@ function ExpenseModal({ form, setForm, close, save }) {
                   <i style={{ width: `${scanProgress}%` }} />
                 </div>
               )}
+              {!scanError && scanProgress === 100 && (
+                <small>
+                  {usedLearnedRule
+                    ? "Local learning matched this merchant."
+                    : "Your corrections will be remembered on this device."}
+                </small>
+              )}
             </div>
+          )}
+
+          {scanSource && scanProgress === 100 && (
+            <button
+              className="receipt-retry"
+              type="button"
+              onClick={() => scanReceipt(scanSource, true)}
+            >
+              Try enhanced scan
+            </button>
           )}
 
           <button
