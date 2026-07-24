@@ -113,7 +113,7 @@ svg {
 }
 
 .currency-toggle {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   margin-bottom: 12px;
 }
 
@@ -284,18 +284,14 @@ svg {
 .bar {
   width: 105px;
   height: 8px;
-  background: #694326;
+  background: linear-gradient(
+    to right,
+    var(--accent-light) 0 var(--progress),
+    #694326 var(--progress) 100%
+  );
   overflow: hidden;
   margin-top: 5px;
   border: 2px solid var(--line);
-}
-
-.bar i {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--accent-light);
-  transform-origin: left center;
 }
 
 .transaction {
