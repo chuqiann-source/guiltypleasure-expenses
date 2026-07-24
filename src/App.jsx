@@ -471,17 +471,14 @@ function App() {
       ? splitForm.itemRows.filter((row) => row.name !== name)
       : [
           ...splitForm.itemRows,
-          { name, items: [{ id: crypto.randomUUID(), label: "", amount: "" }] },
+          { name, items: [{ id: crypto.randomUUID(), amount: "" }] },
         ];
 
     setSplitForm({ ...splitForm, selectedFriends, customRows, itemRows });
   }
 
   function updateCustomValue(name, value) {
-    const clean =
-      splitForm.splitType === "percentage"
-        ? String(value || "").replace(/\D/g, "")
-        : formatCentsInput(value);
+    const clean = formatCentsInput(value);
 
     setSplitForm({
       ...splitForm,
@@ -502,7 +499,7 @@ function App() {
               {
                 name: "You",
                 items: [
-                  { id: crypto.randomUUID(), label: "", amount: "" },
+                  { id: crypto.randomUUID(), amount: "" },
                 ],
               },
               ...splitForm.itemRows,
@@ -520,7 +517,7 @@ function App() {
               ...row,
               items: [
                 ...row.items,
-                { id: crypto.randomUUID(), label: "", amount: "" },
+                { id: crypto.randomUUID(), amount: "" },
               ],
             }
           : row
@@ -528,7 +525,7 @@ function App() {
     });
   }
 
-  function updatePersonItem(name, itemId, field, value) {
+  function updatePersonItem(name, itemId, value) {
     setSplitForm({
       ...splitForm,
       itemRows: splitForm.itemRows.map((row) =>
@@ -537,11 +534,7 @@ function App() {
               ...row,
               items: row.items.map((item) =>
                 item.id === itemId
-                  ? {
-                      ...item,
-                      [field]:
-                        field === "amount" ? formatCentsInput(value) : value,
-                    }
+                  ? { ...item, amount: formatCentsInput(value) }
                   : item
               ),
             }
@@ -616,16 +609,6 @@ function App() {
         .map((row) => ({
           person: row.name,
           amount: Number(row.value) * splitTaxMultiplier,
-          settled: false,
-        }));
-    }
-
-    if (splitForm.splitType === "percentage") {
-      owes = splitForm.customRows
-        .filter((row) => Number(row.value) > 0)
-        .map((row) => ({
-          person: row.name,
-          amount: splitGrandTotal * (Number(row.value) / 100),
           settled: false,
         }));
     }
@@ -978,25 +961,22 @@ function App() {
             </label>
 
             <div className="segmented-split">
-              {["equal", "custom", "percentage", "items"].map((type) => (
+              {["equal", "custom", "items"].map((type) => (
                 <button
                   key={type}
                   type="button"
                   className={splitForm.splitType === type ? "active" : ""}
                   onClick={() => selectSplitType(type)}
                 >
-                  {type === "percentage" ? "%" : type}
+                  {type}
                 </button>
               ))}
             </div>
 
-            {(splitForm.splitType === "custom" ||
-              splitForm.splitType === "percentage") && (
+            {splitForm.splitType === "custom" && (
               <div className="custom-split">
                 <p className="hint">
-                  {splitForm.splitType === "custom"
-                    ? "Enter each player's amount."
-                    : "Enter each player's percentage."}
+                  Enter each player's amount.
                 </p>
 
                 {splitForm.customRows.map((row) => (
@@ -1005,11 +985,7 @@ function App() {
                     <input
                       type="text"
                       inputMode="numeric"
-                      placeholder={
-                        splitForm.splitType === "custom"
-                          ? "0.00"
-                          : "%"
-                      }
+                      placeholder="0.00"
                       value={row.value}
                       onChange={(e) => updateCustomValue(row.name, e.target.value)}
                     />
@@ -1039,23 +1015,11 @@ function App() {
                         </b>
                       </div>
 
-                      {row.items.map((item) => (
+                      {row.items.map((item, index) => (
                         <div className="person-item-row" key={item.id}>
+                          <span className="person-item-number">{index + 1}.</span>
                           <input
-                            aria-label={`${row.name} item`}
-                            placeholder="Item"
-                            value={item.label}
-                            onChange={(e) =>
-                              updatePersonItem(
-                                row.name,
-                                item.id,
-                                "label",
-                                e.target.value
-                              )
-                            }
-                          />
-                          <input
-                            aria-label={`${row.name} item amount`}
+                            aria-label={`${row.name} item ${index + 1} amount`}
                             type="text"
                             inputMode="numeric"
                             placeholder="0.00"
@@ -1064,7 +1028,6 @@ function App() {
                               updatePersonItem(
                                 row.name,
                                 item.id,
-                                "amount",
                                 e.target.value
                               )
                             }
@@ -1152,9 +1115,9 @@ function App() {
                   return (
                     <div className="saved-item-breakdown" key={row.name}>
                       <strong>{row.name}</strong>
-                      {items.map((item) => (
+                      {items.map((item, index) => (
                         <span key={item.id}>
-                          {item.label || "Item"}{" "}
+                          {index + 1}.{" "}
                           <b>{formatMoney(item.amount, bill.currency)}</b>
                         </span>
                       ))}
@@ -1318,7 +1281,7 @@ function CategoryList({ items, max, currency }) {
     <div className="compact-list">
       {items.map((category) => {
         const Icon = category.icon;
-        const width = (category.total / max) * 100;
+        const ratio = Math.min(category.total / max, 1);
 
         return (
           <div className="category-row" key={category.name}>
@@ -1329,7 +1292,7 @@ function CategoryList({ items, max, currency }) {
               <div>
                 <strong>{category.name}</strong>
                 <div className="bar">
-                  <i style={{ width: `${width}%` }} />
+                  <i style={{ transform: `scaleX(${ratio})` }} />
                 </div>
               </div>
             </div>
