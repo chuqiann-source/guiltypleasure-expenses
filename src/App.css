@@ -772,6 +772,19 @@ select:focus {
   color: #42150f;
 }
 
+.receipt-scan-status small {
+  text-transform: none;
+}
+
+.receipt-retry {
+  min-height: 42px;
+  border: 3px solid var(--line);
+  background: #d8b878;
+  color: var(--text);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .scan-progress {
   height: 10px;
   border: 2px solid var(--line);
