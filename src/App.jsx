@@ -33,10 +33,11 @@ const categories = [
   { name: "Others", icon: EllipsisHorizontalCircleIcon },
 ];
 
-const currencies = ["RM", "SGD"];
+const currencies = ["RM", "SGD", "JPY"];
 
 function formatMoney(amount, currency = "RM") {
-  return `${currency} ${Number(amount || 0).toFixed(2)}`;
+  const decimals = currency === "JPY" ? 0 : 2;
+  return `${currency} ${Number(amount || 0).toFixed(decimals)}`;
 }
 
 function formatCentsInput(value) {
@@ -77,14 +78,17 @@ function parseReceiptText(text) {
     .filter(Boolean);
 
   const amountAtEnd =
-    /(?:RM|MYR|SGD|\$)?\s*(\d{1,3}(?:,\d{3})*\.\d{2}|\d{1,6}[,.]\d{2})\s*$/i;
+    /(?:(?:JPY|¥)\s*(\d{1,3}(?:,\d{3})*|\d{1,8})|(?:RM|MYR|SGD|\$)?\s*(\d{1,3}(?:,\d{3})*\.\d{2}|\d{1,6}[,.]\d{2}))\s*$/i;
   const totalWords = /\b(grand\s*total|amount\s*due|balance\s*due|net\s*total|total)\b/i;
   const excludedTotalWords =
     /\b(sub\s*total|subtotal|tax|gst|sst|change|cash|rounding|saving|discount)\b/i;
-  const toAmount = (value) =>
-    Number(
-      value.includes(".") ? value.replaceAll(",", "") : value.replace(",", ".")
-    );
+  const toAmount = (value) => {
+    const normalized =
+      value.includes(".") || /^\d{1,3}(?:,\d{3})+$/.test(value)
+        ? value.replaceAll(",", "")
+        : value.replace(",", ".");
+    return Number(normalized);
+  };
 
   const preferredTotals = lines
     .filter(
@@ -92,12 +96,12 @@ function parseReceiptText(text) {
     )
     .map((line) => line.match(amountAtEnd))
     .filter(Boolean)
-    .map((match) => toAmount(match[1]));
+    .map((match) => toAmount(match[1] || match[2]));
 
   const allAmounts = lines
     .map((line) => line.match(amountAtEnd))
     .filter(Boolean)
-    .map((match) => toAmount(match[1]))
+    .map((match) => toAmount(match[1] || match[2]))
     .filter((amount) => Number.isFinite(amount) && amount > 0);
 
   const merchant =
@@ -1281,7 +1285,7 @@ function CategoryList({ items, max, currency }) {
     <div className="compact-list">
       {items.map((category) => {
         const Icon = category.icon;
-        const ratio = Math.min(category.total / max, 1);
+        const progress = Math.min((category.total / max) * 100, 100);
 
         return (
           <div className="category-row" key={category.name}>
@@ -1291,9 +1295,15 @@ function CategoryList({ items, max, currency }) {
               </div>
               <div>
                 <strong>{category.name}</strong>
-                <div className="bar">
-                  <i style={{ transform: `scaleX(${ratio})` }} />
-                </div>
+                <div
+                  className="bar"
+                  style={{ "--progress": `${progress}%` }}
+                  role="progressbar"
+                  aria-label={`${category.name} category total`}
+                  aria-valuenow={Math.round(progress)}
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                />
               </div>
             </div>
             <b>{formatMoney(category.total, currency)}</b>
