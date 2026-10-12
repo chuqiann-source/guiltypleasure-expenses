@@ -251,10 +251,88 @@ async function preprocessReceipt(imageData) {
   return outputCanvas.toDataURL("image/png");
 }
 
+// Money is stored/displayed in whole minor units to avoid fractional-cent debts.
+const moneyFactor = (currency) => currency === "JPY" ? 1 : 100;
+const units = (value, currency) => Math.round((Number(value) || 0) * moneyFactor(currency));
+const money = (value, currency) => units(value, currency) / moneyFactor(currency);
+const fromUnits = (value, currency) => value / moneyFactor(currency);
+const localToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const makeItem = () => ({ id: crypto.randomUUID(), description: "", amount: "" });
+const makeEmptySplit = (currency) => ({
+  title: "", amount: "", taxPercentage: "", currency, category: "Friends",
+  paidBy: "You", date: localToday(), splitType: "equal",
+  selectedFriends: [], customRows: [], itemRows: [],
+});
+const safeLoad = (key, fallback) => {
+  try {
+    const result = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(fallback) ? (Array.isArray(result) ? result : fallback) : (result ?? fallback);
+  } catch { return fallback; }
+};
+const roundShares = (totalUnits, weights) => {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  if (sum <= 0) return weights.map(() => 0);
+  const raw = weights.map((weight) => totalUnits * weight / sum);
+  const base = raw.map(Math.floor);
+  let leftover = totalUnits - base.reduce((a, b) => a + b, 0);
+  const order = raw.map((v, i) => ({ i, fraction: v - base[i] }))
+    .sort((a, b) => b.fraction - a.fraction || a.i - b.i);
+  for (let i = 0; i < leftover; i++) base[order[i].i]++;
+  return base;
+};
+function calculateBill(form) {
+  const currency = form.currency;
+  const factor = moneyFactor(currency);
+  const people = [...new Set(["You", form.paidBy, ...form.selectedFriends])];
+  const subtotalUnits = form.splitType === "items"
+    ? form.itemRows.reduce((total, row) => total + row.items.reduce((sum, item) => sum + units(item.amount, currency), 0), 0)
+    : units(form.amount, currency);
+  const taxPercentage = Math.max(0, Math.min(100, Number(form.taxPercentage || 0)));
+  const taxUnits = Math.round(subtotalUnits * taxPercentage / 100);
+  const totalUnits = subtotalUnits + taxUnits;
+  const base = people.map((name) => {
+    if (form.splitType === "equal") return 1;
+    if (form.splitType === "custom") return units(form.customRows.find((row) => row.name === name)?.value, currency);
+    return (form.itemRows.find((row) => row.name === name)?.items || []).reduce((sum, item) => sum + units(item.amount, currency), 0);
+  });
+  const allocated = form.splitType === "equal"
+    ? roundShares(totalUnits, base)
+    : roundShares(totalUnits, base);
+  const shares = people.map((person, i) => ({ person, amount: fromUnits(allocated[i], currency) }));
+  const enteredUnits = base.reduce((a, b) => a + b, 0);
+  const valid = subtotalUnits > 0 && (form.splitType === "equal" || enteredUnits === subtotalUnits);
+  return {
+    subtotal: fromUnits(subtotalUnits, currency),
+    taxAmount: fromUnits(taxUnits, currency),
+    amount: fromUnits(totalUnits, currency),
+    taxPercentage, shares, valid,
+    difference: fromUnits(subtotalUnits - enteredUnits, currency),
+  };
+}
+function billShares(bill) {
+  if (Array.isArray(bill.shares) && bill.shares.length) return bill.shares;
+  const owed = (bill.owes || []).map(({ person, amount }) => ({ person, amount }));
+  const payerShare = money(Number(bill.amount || 0) - owed.reduce((sum, row) => sum + Number(row.amount || 0), 0), bill.currency);
+  return [...owed, { person: bill.paidBy, amount: payerShare }];
+}
+function downloadBackup(payload) {
+  const blob = new Blob([JSON.stringify({ format: "guilty-pleasure-backup", version: 2, exportedAt: new Date().toISOString(), ...payload }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `guilty-pleasure-backup-${localToday()}.json`;
+  document.body.appendChild(link);
+  link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function App() {
   const today = new Date();
-  const todayDate = today.toISOString().slice(0, 10);
-  const currentMonth = today.toISOString().slice(0, 7);
+  const todayDate = localToday();
+  const currentMonth = todayDate.slice(0, 7);
 
   const readableDate = today.toLocaleDateString("en-MY", {
     weekday: "long",
@@ -267,15 +345,15 @@ function App() {
   );
 
   const [expenses, setExpenses] = useState(
-    () => JSON.parse(localStorage.getItem("guilty_expenses")) || []
+    () => safeLoad("guilty_expenses", [])
   );
 
   const [friends, setFriends] = useState(
-    () => JSON.parse(localStorage.getItem("guilty_friends")) || ["Alex", "Ben"]
+    () => safeLoad("guilty_friends", ["Alex", "Ben"])
   );
 
   const [splitBills, setSplitBills] = useState(
-    () => JSON.parse(localStorage.getItem("guilty_split_bills")) || []
+    () => safeLoad("guilty_split_bills", [])
   );
 
   const [tab, setTab] = useState("home");
@@ -296,19 +374,13 @@ function App() {
     receiptText: "",
   });
 
-  const [splitForm, setSplitForm] = useState({
-    title: "",
-    amount: "",
-    taxPercentage: "",
-    currency: mainCurrency,
-    category: "Friends",
-    paidBy: "You",
-    date: todayDate,
-    splitType: "equal",
-    selectedFriends: [],
-    customRows: [],
-    itemRows: [],
-  });
+  const [splitForm, setSplitForm] = useState(() => makeEmptySplit(mainCurrency));
+  const [editingBillId, setEditingBillId] = useState(null);
+  const [summaryBill, setSummaryBill] = useState(null);
+  const [summaryPerson, setSummaryPerson] = useState("All");
+  const [splitFilter, setSplitFilter] = useState("all");
+  const [backupError, setBackupError] = useState("");
+
 
   useEffect(() => {
     localStorage.setItem("main_currency", mainCurrency);
@@ -334,9 +406,8 @@ function App() {
       return myDebt ? Number(myDebt.amount || 0) : 0;
     }
 
-    const friendsShare = bill.owes.reduce(
-      (sum, item) => sum + Number(item.amount || 0),
-      0
+    const friendsShare = (bill.owes || []).reduce(
+      (sum, item) => sum + Number(item.amount || 0), 0
     );
 
     return Math.max(amount - friendsShare, 0);
@@ -440,7 +511,7 @@ function App() {
 
   const maxCategory = categoryTotals[0]?.total || 1;
   const maxHistoryCategory = historyCategoryTotals[0]?.total || 1;
-  const recentExpenses = currentMonthExpenses.slice(0, 5);
+  const recentExpenses = [...currentMonthExpenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
 
   function addExpense(e) {
     e.preventDefault();
@@ -515,14 +586,14 @@ function App() {
       ? splitForm.itemRows.filter((row) => row.name !== name)
       : [
           ...splitForm.itemRows,
-          { name, items: [{ id: crypto.randomUUID(), amount: "" }] },
+          { name, items: [makeItem()] },
         ];
 
     setSplitForm({ ...splitForm, selectedFriends, customRows, itemRows });
   }
 
   function updateCustomValue(name, value) {
-    const clean = formatCentsInput(value);
+    const clean = splitForm.currency === "JPY" ? value.replace(/\D/g, "") : formatCentsInput(value);
 
     setSplitForm({
       ...splitForm,
@@ -543,7 +614,7 @@ function App() {
               {
                 name: "You",
                 items: [
-                  { id: crypto.randomUUID(), amount: "" },
+                  makeItem(),
                 ],
               },
               ...splitForm.itemRows,
@@ -561,7 +632,7 @@ function App() {
               ...row,
               items: [
                 ...row.items,
-                { id: crypto.randomUUID(), amount: "" },
+                makeItem(),
               ],
             }
           : row
@@ -578,13 +649,21 @@ function App() {
               ...row,
               items: row.items.map((item) =>
                 item.id === itemId
-                  ? { ...item, amount: formatCentsInput(value) }
+                   ? { ...item, amount: splitForm.currency === "JPY" ? value.replace(/\D/g, "") : formatCentsInput(value) }
                   : item
               ),
             }
           : row
       ),
     });
+  }
+
+  function updateItemDescription(name, itemId, description) {
+    setSplitForm((current) => ({ ...current,
+      itemRows: current.itemRows.map((row) => row.name === name
+        ? { ...row, items: row.items.map((item) => item.id === itemId ? { ...item, description } : item) }
+        : row),
+    }));
   }
 
   function removePersonItem(name, itemId) {
@@ -602,106 +681,71 @@ function App() {
   }
 
   const itemizedRows = splitForm.itemRows;
-
-  const itemizedTotal = itemizedRows.reduce(
-    (total, row) =>
-      total +
-      row.items.reduce((sum, item) => sum + Number(item.amount || 0), 0),
-    0
-  );
-
-  const splitSubtotal =
-    splitForm.splitType === "items"
-      ? itemizedTotal
-      : Number(splitForm.amount || 0);
-  const splitTaxPercentage = Math.min(
-    Math.max(Number(splitForm.taxPercentage || 0), 0),
-    100
-  );
-  const splitTaxMultiplier = 1 + splitTaxPercentage / 100;
-  const splitTaxAmount = splitSubtotal * (splitTaxPercentage / 100);
-  const splitGrandTotal = splitSubtotal + splitTaxAmount;
+  const preview = calculateBill(splitForm);
+  const splitSubtotal = preview.subtotal;
+  const splitTaxPercentage = preview.taxPercentage;
+  const splitTaxAmount = preview.taxAmount;
+  const splitGrandTotal = preview.amount;
 
   function addSplitBill(e) {
     e.preventDefault();
-
-    const amount = splitGrandTotal;
-    if (!splitForm.title || !amount || !splitForm.paidBy) return;
-    if (splitForm.selectedFriends.length === 0) return;
-
-    let owes = [];
-
-    if (splitForm.splitType === "equal") {
-      const people = Array.from(
-        new Set([splitForm.paidBy, "You", ...splitForm.selectedFriends])
-      );
-
-      const perPerson = amount / people.length;
-
-      owes = people
-        .filter((person) => person !== splitForm.paidBy)
-        .map((person) => ({
-          person,
-          amount: perPerson,
-          settled: false,
-        }));
+    if (!splitForm.title.trim() || !preview.valid || !splitForm.selectedFriends.length) {
+      window.alert("Check the bill title, participants, and amounts. All shares must equal the subtotal.");
+      return;
     }
-
-    if (splitForm.splitType === "custom") {
-      owes = splitForm.customRows
-        .filter((row) => Number(row.value) > 0)
-        .map((row) => ({
-          person: row.name,
-          amount: Number(row.value) * splitTaxMultiplier,
-          settled: false,
-        }));
+    const owes = preview.shares.filter((share) => share.person !== splitForm.paidBy && share.amount > 0)
+      .map((share) => ({ ...share, settled: false }));
+    const previous = editingBillId ? splitBills.find((bill) => bill.id === editingBillId) : null;
+    if (previous) {
+      // Keep existing paid statuses only where the debt amount and person did not change.
+      owes.forEach((row) => {
+        const old = previous.owes.find((item) => item.person === row.person && units(item.amount, splitForm.currency) === units(row.amount, splitForm.currency));
+        if (old) row.settled = Boolean(old.settled);
+      });
     }
-
-    if (splitForm.splitType === "items") {
-      owes = itemizedRows
-        .map((row) => ({
-          person: row.name,
-          amount: row.items.reduce(
-            (sum, item) => sum + Number(item.amount || 0),
-            0
-          ) * splitTaxMultiplier,
-          settled: false,
-        }))
-        .filter(
-          (row) => row.person !== splitForm.paidBy && row.amount > 0
-        );
-    }
-
-    const newBill = {
-      id: crypto.randomUUID(),
-      title: splitForm.title.trim(),
-      amount,
-      subtotal: splitSubtotal,
-      taxPercentage: splitTaxPercentage,
-      taxAmount: splitTaxAmount,
-      currency: splitForm.currency,
-      category: splitForm.category,
-      paidBy: splitForm.paidBy.trim(),
-      date: splitForm.date,
-      splitType: splitForm.splitType,
-      owes,
-      itemRows: splitForm.splitType === "items" ? itemizedRows : undefined,
+    const bill = {
+      id: editingBillId || crypto.randomUUID(),
+      title: splitForm.title.trim(), amount: preview.amount,
+      subtotal: preview.subtotal, taxPercentage: preview.taxPercentage,
+      taxAmount: preview.taxAmount, currency: splitForm.currency,
+      category: splitForm.category, paidBy: splitForm.paidBy,
+      date: splitForm.date, splitType: splitForm.splitType,
+      selectedFriends: [...splitForm.selectedFriends],
+      customRows: splitForm.customRows.map((row) => ({ ...row })),
+      shares: preview.shares, owes,
+      itemRows: splitForm.splitType === "items" ? structuredClone(splitForm.itemRows) : [],
     };
+    setSplitBills((current) => editingBillId
+      ? current.map((row) => row.id === editingBillId ? bill : row)
+      : [bill, ...current]);
+    setEditingBillId(null);
+    setSplitForm(makeEmptySplit(mainCurrency));
+  }
 
-    setSplitBills([newBill, ...splitBills]);
-    setSplitForm({
-      title: "",
-      amount: "",
-      taxPercentage: "",
-      currency: mainCurrency,
-      category: "Friends",
-      paidBy: "You",
-      date: todayDate,
-      splitType: "equal",
-      selectedFriends: [],
-      customRows: [],
-      itemRows: [],
-    });
+  function editSplitBill(bill) {
+    const people = billShares(bill);
+    const selectedFriends = bill.selectedFriends || people.map((row) => row.person).filter((name) => name !== "You" && name !== bill.paidBy);
+    const customRows = bill.customRows?.length ? bill.customRows : selectedFriends.map((name) => ({ name, value: String(people.find((p) => p.person === name)?.amount || "") }));
+    const itemRows = bill.itemRows?.length ? structuredClone(bill.itemRows) : [{ name: "You", items: [makeItem()] }, ...selectedFriends.map((name) => ({ name, items: [makeItem()] }))];
+    setSplitForm({ title: bill.title, amount: String(bill.subtotal ?? bill.amount), taxPercentage: String(bill.taxPercentage || ""),
+      currency: bill.currency, category: bill.category || "Friends", paidBy: bill.paidBy, date: bill.date,
+      splitType: bill.splitType || "equal", selectedFriends, customRows, itemRows });
+    setEditingBillId(bill.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function restoreBackup(file) {
+    if (!file) return;
+    setBackupError("");
+    file.text().then((raw) => {
+      const data = JSON.parse(raw);
+      if (data.format !== "guilty-pleasure-backup" || !Array.isArray(data.expenses) || !Array.isArray(data.friends) || !Array.isArray(data.splitBills)) throw new Error("Invalid backup file");
+      if (!window.confirm("Replace all current expenses, friends, and split bills with this backup?")) return;
+      setExpenses(data.expenses); setFriends(data.friends); setSplitBills(data.splitBills);
+      if (currencies.includes(data.mainCurrency)) setMainCurrency(data.mainCurrency);
+      if (Array.isArray(data.receiptRules)) localStorage.setItem(receiptRulesKey, JSON.stringify(data.receiptRules));
+      setEditingBillId(null); setSplitForm(makeEmptySplit(data.mainCurrency || mainCurrency));
+    }).catch((error) => setBackupError(error.message || "Could not restore backup"));
   }
 
   function deleteSplitBill(id) {
@@ -913,7 +957,7 @@ function App() {
                 onChange={(e) =>
                   setSplitForm({
                     ...splitForm,
-                    amount: formatCentsInput(e.target.value),
+                    amount: splitForm.currency === "JPY" ? e.target.value.replace(/\D/g, "") : formatCentsInput(e.target.value),
                   })
                 }
               />
@@ -1035,6 +1079,16 @@ function App() {
                     />
                   </div>
                 ))}
+                <div className="custom-row">
+                  <span>You</span>
+                  <input type="text" inputMode="numeric" placeholder="0.00"
+                    value={splitForm.customRows.find((row) => row.name === "You")?.value || ""}
+                    onChange={(e) => {
+                      const value = splitForm.currency === "JPY" ? e.target.value.replace(/\D/g, "") : formatCentsInput(e.target.value);
+                      setSplitForm((current) => ({ ...current, customRows: [...current.customRows.filter((row) => row.name !== "You"), { name: "You", value }] }));
+                    }}
+                  />
+                </div>
               </div>
             )}
 
@@ -1062,6 +1116,13 @@ function App() {
                       {row.items.map((item, index) => (
                         <div className="person-item-row" key={item.id}>
                           <span className="person-item-number">{index + 1}.</span>
+                          <input
+                            className="item-description-input"
+                            aria-label={`${row.name} item ${index + 1} description`}
+                            placeholder="Item name"
+                            value={item.description || ""}
+                            onChange={(e) => updateItemDescription(row.name, item.id, e.target.value)}
+                          />
                           <input
                             aria-label={`${row.name} item ${index + 1} amount`}
                             type="text"
@@ -1118,13 +1179,22 @@ function App() {
               </strong>
             </div>
 
-            <button className="save-btn" type="submit">
-              save split
+            {!preview.valid && splitForm.splitType !== "equal" && (
+              <p className="validation-error">Shares must match subtotal. Difference: {formatMoney(preview.difference, splitForm.currency)}</p>
+            )}
+            <button className="save-btn" type="submit" disabled={!preview.valid}>
+              {editingBillId ? "Update split" : "Save split"}
             </button>
+            {editingBillId && <button className="secondary-btn" type="button" onClick={() => { setEditingBillId(null); setSplitForm(makeEmptySplit(mainCurrency)); }}>Cancel edit</button>}
           </form>
 
+          <div className="split-history-controls">
+            {[["all", "All"], ["outstanding", "Outstanding"], ["settled", "Settled"]].map(([value, label]) => (
+              <button key={value} type="button" className={splitFilter === value ? "active" : ""} onClick={() => setSplitFilter(value)}>{label}</button>
+            ))}
+          </div>
           <div className="split-list">
-            {splitBills.map((bill) => (
+            {splitBills.filter((bill) => splitFilter === "all" || (splitFilter === "settled" ? bill.owes.every((item) => item.settled) : bill.owes.some((item) => !item.settled))).map((bill) => (
               <div className="split-card" key={bill.id}>
                 <div className="split-top">
                   <div>
@@ -1150,6 +1220,10 @@ function App() {
                   </button>
                 </div>
 
+                <div className="bill-actions">
+                  <button type="button" onClick={() => { setSummaryBill(bill); setSummaryPerson("All"); }}>View summary</button>
+                  <button type="button" onClick={() => editSplitBill(bill)}>Edit</button>
+                </div>
                 {bill.itemRows?.map((row) => {
                   const items = row.items.filter(
                     (item) => Number(item.amount || 0) > 0
@@ -1161,7 +1235,7 @@ function App() {
                       <strong>{row.name}</strong>
                       {items.map((item, index) => (
                         <span key={item.id}>
-                          {index + 1}.{" "}
+                          {item.description?.trim() || `Item ${index + 1}`} {" "}
                           <b>{formatMoney(item.amount, bill.currency)}</b>
                         </span>
                       ))}
@@ -1199,6 +1273,15 @@ function App() {
             <h2>Archive</h2>
           </div>
 
+          <div className="backup-panel">
+            <strong>Data backup</strong>
+            <p>Keep a copy of your expenses, friends, and bills.</p>
+            <div className="backup-actions">
+              <button type="button" onClick={() => downloadBackup({ expenses, friends, splitBills, mainCurrency, receiptRules: loadReceiptRules() })}>Export backup</button>
+              <label>Import backup <input type="file" accept="application/json,.json" onChange={(e) => { restoreBackup(e.target.files?.[0]); e.target.value = ""; }} /></label>
+            </div>
+            {backupError && <p className="validation-error">{backupError}</p>}
+          </div>
           <div className="month-input-wrap">
             <input
               type="month"
@@ -1309,6 +1392,10 @@ function App() {
         />
       )}
 
+      {summaryBill && (
+        <BillSummary bill={summaryBill} person={summaryPerson} setPerson={setSummaryPerson} close={() => setSummaryBill(null)} />
+      )}
+
       {showSettlement && (
         <SettlementModal
           close={() => setShowSettlement(false)}
@@ -1317,6 +1404,47 @@ function App() {
       )}
 
     </main>
+  );
+}
+
+function BillSummary({ bill, person, setPerson, close }) {
+  const shares = billShares(bill);
+  const shown = person === "All" ? shares : shares.filter((row) => row.person === person);
+  const debt = (bill.owes || []).filter((row) => person === "All" || row.person === person);
+  const outstanding = debt.filter((row) => !row.settled).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  return (
+    <div className="modal-backdrop">
+      <section className="modal bill-summary-modal">
+        <div className="modal-head"><h2>Bill summary</h2><button type="button" className="delete-btn" onClick={close}><XMarkIcon /></button></div>
+        <label className="summary-selector">Show <select value={person} onChange={(e) => setPerson(e.target.value)}>
+          <option value="All">Whole group</option>
+          {shares.map((row) => <option key={row.person} value={row.person}>{row.person}</option>)}
+        </select></label>
+        <div className="share-receipt">
+          <h2>GUILTY PLEASURE</h2><p className="receipt-subtitle">BILL SUMMARY</p>
+          <h3>{bill.title}</h3><p>{bill.date} · Paid by {bill.paidBy}</p>
+          <div className="receipt-divider" />
+          <div className="receipt-line"><span>Subtotal</span><b>{formatMoney(bill.subtotal ?? bill.amount, bill.currency)}</b></div>
+          <div className="receipt-line"><span>Tax ({Number(bill.taxPercentage || 0).toFixed(2)}%)</span><b>{formatMoney(bill.taxAmount || 0, bill.currency)}</b></div>
+          <div className="receipt-line receipt-total"><span>Bill total</span><b>{formatMoney(bill.amount, bill.currency)}</b></div>
+          <h4>{person === "All" ? "PLAYER BREAKDOWN" : `${person.toUpperCase()} BREAKDOWN`}</h4>
+          {shown.map((row) => (
+            <div key={row.person}>
+              <div className="receipt-line"><strong>{row.person}</strong><b>{formatMoney(row.amount, bill.currency)}</b></div>
+              {(bill.itemRows || []).filter((itemRow) => itemRow.name === row.person).flatMap((itemRow) => itemRow.items || []).filter((item) => Number(item.amount) > 0).map((item, index) => (
+                <div className="receipt-line receipt-item" key={item.id || index}><span>{item.description || `Item ${index + 1}`}</span><span>{formatMoney(item.amount, bill.currency)}</span></div>
+              ))}
+            </div>
+          ))}
+          <h4>PAYMENT SUMMARY</h4>
+          {debt.length ? debt.map((row) => (
+            <div className="receipt-line" key={row.person}><span>{row.person} → {bill.paidBy} {row.settled ? "✓ Paid" : ""}</span><b>{formatMoney(row.amount, bill.currency)}</b></div>
+          )) : <p>No payment required.</p>}
+          <div className="receipt-outstanding"><span>{person === "All" ? "TOTAL OUTSTANDING" : "OUTSTANDING TO PAY"}</span><strong>{formatMoney(outstanding, bill.currency)}</strong></div>
+        </div>
+        <p className="hint">Screenshot the summary above to share. No image export or partial-payment feature is included.</p>
+      </section>
+    </div>
   );
 }
 
@@ -1564,7 +1692,7 @@ function ExpenseModal({ form, setForm, close, save }) {
             onChange={(e) =>
               setForm({
                 ...form,
-                amount: formatCentsInput(e.target.value),
+                amount: form.currency === "JPY" ? e.target.value.replace(/\D/g, "") : formatCentsInput(e.target.value),
               })
             }
           />
