@@ -970,3 +970,37 @@ select:focus {
     width: 82px;
   }
 }
+/* Split sharing, editing, filters and backups */
+.person-item-row { grid-template-columns: 24px minmax(0, 1fr) 85px 32px; }
+.person-item-row .item-description-input { min-width: 0; }
+.person-item-row input { min-width: 0; }
+.bill-actions, .backup-actions, .split-history-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.bill-actions { margin-top: 10px; }
+.bill-actions button, .backup-actions button, .backup-actions label,
+.split-history-controls button, .secondary-btn {
+  border: 2px solid var(--line); background: #e2bf78; color: var(--text);
+  padding: 9px 10px; font-weight: 900; font-size: 11px; cursor: pointer;
+}
+.split-history-controls .active { background: var(--accent-light); }
+.backup-panel { border: 3px solid var(--line); padding: 12px; background: #d8b878; margin-bottom: 12px; }
+.backup-panel p { font-size: 11px; }
+.backup-actions label { position: relative; overflow: hidden; }
+.backup-actions label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.validation-error { color: #8b1e13; font-weight: 900; font-size: 12px; }
+.bill-summary-modal { max-height: 92dvh; }
+.summary-selector { display: grid; gap: 5px; font-weight: 900; margin-bottom: 12px; }
+.share-receipt { background: #f7e8bf; border: 4px solid var(--line); padding: 16px; color: #24160d; }
+.share-receipt h2, .share-receipt .receipt-subtitle { text-align: center; margin: 0; }
+.share-receipt h2 { font-size: 18px; }
+.share-receipt h3 { font-size: 17px; margin-bottom: 3px; overflow-wrap: anywhere; }
+.share-receipt h4 { margin: 16px 0 8px; border-bottom: 2px solid var(--line); padding-bottom: 5px; }
+.share-receipt p { font-size: 12px; }
+.receipt-divider { border-top: 2px dashed var(--line); margin: 12px 0; }
+.receipt-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 6px 0; font-size: 12px; }
+.receipt-line span:first-child { overflow-wrap: anywhere; }
+.receipt-line b { white-space: nowrap; }
+.receipt-item { padding-left: 10px; opacity: .8; font-size: 11px; }
+.receipt-total { border-top: 2px solid var(--line); padding-top: 8px; font-weight: 900; }
+.receipt-outstanding { margin-top: 14px; padding: 12px; background: #79c16b; border: 3px solid var(--line); display: grid; gap: 4px; text-align: center; font-weight: 900; }
+.receipt-outstanding strong { font-size: 21px; }
+@media (max-width: 390px) { .person-item-row { grid-template-columns: 18px minmax(0, 1fr) 74px 28px; gap: 4px; } .person-item-row input { padding: 6px 4px; font-size: 12px; } }
